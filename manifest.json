@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Storyline Review Tools",
+  "version": "1.0.0",
+  "description": "Unlock navigation and pre-select correct quiz answers in Storyline courses on Articulate Review, to review them faster.",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "sidePanel"],
+  "background": { "service_worker": "src/background.js" },
+  "action": {
+    "default_title": "Storyline Review Tools",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" }
+  },
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "side_panel": { "default_path": "sidepanel/sidepanel.html" },
+  "content_scripts": [
+    {
+      "matches": ["https://articulateusercontent.com/review/*"],
+      "exclude_matches": ["https://articulateusercontent.com/review/*/analytics-frame.html*"],
+      "js": ["src/core.js", "src/hook.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://articulateusercontent.com/review/*"],
+      "exclude_matches": ["https://articulateusercontent.com/review/*/analytics-frame.html*"],
+      "js": ["src/bridge.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}

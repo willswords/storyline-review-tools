@@ -1,0 +1,10 @@
+{
+  "_comment": "Copy to courses.json (not in git) and fill in. Review links: Articulate Review > a course > Share > copy the review link.",
+  "navigation": "A Review link to a course whose menu is \"restricted\" and that has triggers disabling Next/Prev",
+  "answers": [
+    "A Review link to a course with a multiple-choice or true/false quiz",
+    "(more courses with quizzes, optional)"
+  ],
+  "extension": "A Review link to a course with a \"restricted\" menu and a quiz (used for the full extension test)",
+  "questionTypesPackage": "A published Storyline course (.zip or an unzipped folder) with fill-in, numeric and hotspot questions"
+}

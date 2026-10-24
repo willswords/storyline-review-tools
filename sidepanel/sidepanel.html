@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Storyline Review Tools</title>
+<link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+<header>
+  <h1>Storyline Review Tools</h1>
+  <div id="course" class="course">Looking for a Storyline course in this tab…</div>
+</header>
+
+<section id="slSec">
+  <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>Storyline testing</button><span class="grow"></span>
+    <button id="btnReload" class="small" title="Reload the course in this tab" hidden>Reload course</button></h2>
+  <div class="sl-intro">Changes are made in this browser as the course loads, so the course on Review isn’t changed. Each change reloads the course.</div>
+  <label class="chk sl"><input type="checkbox" id="slFree"> Free navigation (menu)</label>
+  <div class="sl-note" id="slFreeNote"></div>
+  <label class="chk sl"><input type="checkbox" id="slSeek"> Unlock seekbar</label>
+  <div class="sl-note" id="slSeekNote"></div>
+  <label class="chk sl"><input type="checkbox" id="slNav"> Unlock Next/Prev buttons</label>
+  <div class="sl-note" id="slNavNote"></div>
+  <label class="chk sl"><input type="checkbox" id="slAnswers"> Pre-select correct quiz answers</label>
+  <div class="sl-note" id="slAnswersNote"></div>
+  <div class="sl-foot">These settings apply to every Review course you open until you turn them off. The toolbar button shows <b>ON</b> while any of them is on.</div>
+</section>
+
+<section id="quizSec" hidden>
+  <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>Quiz answers</button><span class="count" id="quizCount"></span></h2>
+  <div class="quiz-info" id="quizInfo"></div>
+  <ol id="quizList"></ol>
+</section>
+
+<script src="../src/core.js"></script>
+<script src="sidepanel.js"></script>
+</body>
+</html>

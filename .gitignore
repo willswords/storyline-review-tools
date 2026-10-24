@@ -1,0 +1,5 @@
+# Test courses: Review links can be opened by anyone who has them
+tests/courses.json
+# Screenshots from the tests
+tests/output/
+node_modules/

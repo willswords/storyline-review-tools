@@ -43,6 +43,24 @@ for (const [id, key] of Object.entries(KEYS)) {
     chrome.storage.local.set({ settings });
   });
 }
+// "Unlock all navigation": turns on (or off) every navigation option the course has something to unlock, saved in one
+// go so the course reloads once. Ticked when they're all on, a dash when only some are.
+const NAV_IDS = ['slFree', 'slSeek', 'slNav'];
+const availableNav = () => NAV_IDS.filter(id => !$(id).disabled);
+$('slAllNav').addEventListener('change', e => {
+  const on = e.target.checked, change = {};
+  for (const id of availableNav()) change[KEYS[id]] = on;
+  settings = Object.assign({}, settings, change);
+  chrome.storage.local.set({ settings });
+  render(state);
+});
+function renderAllNav() {
+  const ids = availableNav(), on = ids.filter(id => $(id).checked).length;
+  const all = $('slAllNav');
+  all.disabled = !ids.length;
+  all.checked = !!ids.length && on === ids.length;
+  all.indeterminate = on > 0 && on < ids.length;
+}
 $('btnReload').addEventListener('click', () => { chrome.tabs.sendMessage(tabId, { type: 'reload' }).catch(() => {}); });
 
 // ── Collapsible sections (remembered in this browser) ──
@@ -102,7 +120,51 @@ function render(st) {
       (can < qs.length ? ' The others (such as drag-and-drop and drop-down questions) are answered by hand; see Quiz answers.' : '');
   $('slAnswers').disabled = !!st && !!locks && locks.checked && !can && !settings.answers;
 
+  renderAllNav();
+  renderCompletion(st && st.completion);
   renderQuiz(st && st.quiz);
+}
+
+// Completion: the status the course has reported in this session, what an LMS would get, and how the course completes
+const mmss = ms => Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0');
+const onSlide = sl => sl && sl.number ? 'slide ' + esc(sl.number) + (sl.title ? ' “' + esc(sl.title) + '”' : '') : sl && sl.title ? '“' + esc(sl.title) + '”' : '';
+function renderCompletion(c) {
+  $('compSec').hidden = !c;
+  if (!c) return;
+  const words = core.STATUS_WORDS;
+  const last = [...c.history].reverse().find(h => h.kind === 'status' || h.kind === 'reset');
+  const done = c.status && c.status !== 'incomplete';
+  const cls = !done ? '' : c.status === 'fail' ? 'fail' : 'ok';
+  $('compNow').innerHTML = '<span class="badge ' + cls + '">' + (done ? (c.status === 'fail' ? '✕ ' : '✓ ') + esc(words[c.status]) : c.status ? 'Incomplete' : 'Not reported yet') + '</span>' +
+    '<span class="when">' + (c.watching === false ? 'Can’t follow this course’s status: its Storyline player isn’t one this extension knows.'
+      : done && last ? 'From the ' + esc(last.reason || 'course') + (onSlide(last.slide) ? ', on ' + onSlide(last.slide) : '') + ', ' + mmss(last.at) + ' into the session.'
+      : c.status === 'incomplete' && last ? 'Set back to incomplete on ' + (onSlide(last.slide) || 'a slide') + ', ' + mmss(last.at) + ' into the session (such as when a quiz is retried).'
+      : c.watching ? 'Watching the course. A message shows over the course when its status changes.' : 'Waiting for the course to start…') +
+      (!done && c.score != null ? ' Score so far: ' + esc(c.score) + '%.' : '') + '</span>';
+  // What an LMS would get, for the status reported now: under "LMS details", closed until opened (its contents are
+  // replaced, never the element itself, so it stays open as the state updates)
+  const calls = c.status && core.LMS_CALLS[c.status], score = c.score != null ? core.SCORE_CALLS(c.score) : null;
+  $('compLms').hidden = !calls;
+  $('compCalls').innerHTML = !calls ? '' :[['SCORM 1.2', 'scorm12'], ['SCORM 2004', 'scorm2004'], ['xAPI', 'xapi']].map(([label, k]) =>
+    '<span>' + label + '</span><span><code>' + esc(calls[k]) + '</code>' + (score && k !== 'xapi' ? '<br><code>' + esc(score[k]) + '</code>' : '') + '</span>').join('');
+  $('compHistory').innerHTML = c.history.map(h => '<li><span class="t">' + mmss(h.at) + '</span>' + (
+    h.kind === 'reset' ? 'Back to Incomplete'
+    : '<span class="' + (h.status === 'fail' ? 'fail' : 'ok') + '">' + esc(words[h.status]) + '</span>' + (h.score != null ? ' · score ' + esc(h.score) + '%' : '') + (h.reason ? ' · ' + esc(h.reason) : '')) +
+    (onSlide(h.slide) ? ' · ' + onSlide(h.slide) : '') + '</li>').join('');
+
+  // How the course completes, from data.js
+  const info = c.info;
+  if (!info) { $('compHow').innerHTML = '<div class="rep">Reading the course…</div>'; return; }
+  const where = w => w.map(x => '<div class="where">' + (x.number ? 'Slide ' + esc(x.number) + ' “' + esc(x.title) + '”' : esc(x.title)) + ', ' + esc(x.when) + '</div>').join('');
+  const list = info.criteria.map(x => '<li>' + esc(x.text) + where(x.where) + (x.detail && !x.where.length ? '<div class="where">' + esc(x.detail) + '</div>' : '') + '</li>');
+  const rep = info.reports;
+  const hasQuiz = info.criteria.some(x => x.kind === 'quiz');
+  $('compHow').innerHTML = (info.criteria.length ? (info.any ? 'Complete when <b>any one</b> is met (the first one met gives the status):' : 'Complete when:') + '<ul>' + list.join('') + '</ul>' : '') +
+    (info.incompleteTriggers.length ? '<div class="rep">Incomplete Course triggers (report ' + esc(rep ? rep.notMetWord : 'not met') + '):' + where(info.incompleteTriggers) + '</div>' : '') +
+    (rep ? '<div class="rep">Reports <b>' + esc(rep.metWord) + '</b> when met' + (hasQuiz ? ', and <b>' + esc(rep.notMetWord) + '</b> when the quiz is failed' : '') +
+      '. These words come from the course’s Reporting setting; check it’s the same under Publish › LMS › Reporting and Tracking.</div>' : '') +
+    (info.checked ? '' : '<div class="rep">Still reading some slides…</div>') +
+    info.problems.map(p => '<div class="problem">⚠ ' + esc(p) + '</div>').join('');
 }
 
 // The answer key, as the course scores it

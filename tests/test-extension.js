@@ -37,6 +37,9 @@ const EXT = path.join(__dirname, '..');
     const listed = await P(`document.querySelectorAll('#quizList li').length`);
     check('the quiz answers are listed', listed > 0, listed + ' question(s)');
     check('the toolbar badge is off', (await badge()) === '');
+    const how = await waitP(`!document.getElementById('compSec').hidden && /Complete when/.test(document.getElementById('compHow').textContent) && document.getElementById('compHow').textContent`, 20000);
+    check('the Completion section says how the course completes', !!how, how || await P(`document.getElementById('compHow').textContent`));
+    check('… and that nothing is reported yet', /Not reported yet/.test(await note('compNow')), await note('compNow'));
 
     // Turn on free navigation and answers: the course reloads with them
     await P(`document.getElementById('slFree').click(); document.getElementById('slAnswers').click(); 1`);
@@ -69,6 +72,33 @@ const EXT = path.join(__dirname, '..');
     const back = await waitP(`/"restricted"\\.$/.test(document.getElementById('slFreeNote').textContent.trim())`);
     check('turning the settings off reloads the published course', !!back, await note('slFreeNote'));
     check('the toolbar badge is off again', (await badge()) === '');
+
+    // "Unlock all navigation": the options the course can use, in one save; a dash when only some are on
+    const all = () => P(`(() => { const a = document.getElementById('slAllNav'); return { checked: a.checked, mixed: a.indeterminate, disabled: a.disabled }; })()`);
+    const saved = () => P(`chrome.storage.local.get('settings').then(r => r.settings)`);
+    check('“Unlock all navigation” starts unticked', JSON.stringify(await all()) === '{"checked":false,"mixed":false,"disabled":false}', JSON.stringify(await all()));
+    check('the seekbar option is unavailable here (already draggable)', await P(`document.getElementById('slSeek').disabled`));
+    await P(`document.getElementById('slAllNav').click(); 1`);
+    await sleep(1000);
+    let s = await saved();
+    check('ticking it turns on free navigation and Next/Prev, and leaves the unavailable seekbar alone', s && s.freeNav && s.nav && !s.seekbar && !s.answers, JSON.stringify(s));
+    check('… and it shows ticked', JSON.stringify(await all()) === '{"checked":true,"mixed":false,"disabled":false}', JSON.stringify(await all()));
+    const reloaded = await waitP(`/opened as "free"/.test(document.getElementById('slFreeNote').textContent) && /kept enabled/.test(document.getElementById('slNavNote').textContent)`);
+    check('the course reloads with both on', !!reloaded, await note('slNavNote'));
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 400, height: 900, deviceScaleFactor: 1, mobile: false }, panel);
+    saveScreenshot('side-panel-all-nav.png', (await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 400, height: 420, scale: 1 } }, panel)).result.data);
+    await P(`document.getElementById('slNav').click(); 1`);
+    await sleep(500);
+    check('turning one off shows a dash (some on)', JSON.stringify(await all()) === '{"checked":false,"mixed":true,"disabled":false}', JSON.stringify(await all()));
+    await P(`document.getElementById('slAllNav').click(); 1`);
+    await sleep(500);
+    s = await saved();
+    check('clicking the dash turns them all on again', s && s.freeNav && s.nav && (await all()).checked, JSON.stringify(s));
+    await P(`document.getElementById('slAllNav').click(); 1`);
+    await sleep(500);
+    s = await saved();
+    check('unticking it turns them all off', s && !s.freeNav && !s.nav && !s.seekbar, JSON.stringify(s));
+    check('the course goes back to the published one', !!(await waitP(`/"restricted"\\.$/.test(document.getElementById('slFreeNote').textContent.trim())`)), await note('slFreeNote'));
   } catch (e) {
     check('test ran without errors', false, e && e.message);
   } finally {

@@ -24,8 +24,11 @@
     locks: null,            // { nav, seek, slidesWithNav, slideFiles, checked } across all slides
     quiz: null,             // the answer key (core.buildQuizKey)
     changed: { frame: 0, nav: 0, seek: 0, answers: 0, slides: 0 },
+    // How the course completes (core.completionInfo), and what it has reported in this session
+    completion: { info: null, watching: null, status: null, score: null, history: [] },
     errors: []
   };
+  const startedAt = Date.now();
   let data = null;                      // data.js, as published
   const slideCache = new Map();         // html5url → slide JSON as published
   const fileOfSlide = new Map();        // slide id → html5url
@@ -51,6 +54,157 @@
   function updateQuiz() {
     if (data) state.quiz = core.buildQuizKey(data, f => slideCache.get(f) || null);
   }
+  function updateCompletion() {
+    if (data) state.completion.info = core.completionInfo(data, f => slideCache.get(f) || null);
+  }
+
+  // ── Completion: what the course would report to an LMS ──
+  // On Review the player has no LMS to report to, but it still works out the course's status and announces each change
+  // on its event bus (DS.pubSub). This listens to the same events as the player's SCORM interface and follows its rules,
+  // so it reports what that interface would send: the first Passed, Failed or Completed (again after the scored quiz is
+  // retried), Incomplete whenever the status falls back to it, and the quiz score until a status is sent.
+  function watchCompletion() {
+    let tries = 0;
+    const timer = setInterval(() => {
+      const DS = window.DS;
+      if (DS && DS.pubSub && typeof DS.pubSub.on === 'function' && DS.events && DS.presentation && typeof DS.presentation.scorings === 'function') {
+        clearInterval(timer);
+        try { listenForStatus(DS); } catch (e) { state.completion.watching = false; fail('completion', e); }
+      } else if (++tries > 1200) { clearInterval(timer); state.completion.watching = false; sendState(); }   // 2 minutes: a player this doesn't know
+    }, 100);
+  }
+  function listenForStatus(DS) {
+    const E = DS.events, ev = (group, name, fallback) => (E[group] && E[group][name]) || fallback;
+    const scorings = () => DS.presentation.scorings();
+    const isQuiz = t => !!t && typeof t.isType === 'function' && t.isType('quiz');
+    const lms = { sent: false, lastStatus: null, lastScore: null, scored: null };
+    // The slide showing now, numbered as in the menu
+    const currentSlide = () => {
+      try {
+        const s = DS.windowManager.getCurrentWindow().getCurrentSlide();
+        const hit = data && core.slideOf(core.slideIndex(data), s.absoluteId);
+        return hit ? { number: hit.number, title: hit.title } : { number: '', title: String(s.get('title') || '').replace(/<[^>]*>/g, '').trim() };
+      } catch (e) { return null; }
+    };
+    // Which tracking option the status comes from: the first one met, as the player's getStatus picks it
+    const reason = () => {
+      try {
+        const first = scorings().find(s => s.isCourseComplete());
+        return !first ? '' : first.isAction() ? 'Complete Course trigger' : first.isView() ? 'slides viewed' : 'quiz result';
+      } catch (e) { return ''; }
+    };
+    // The history of status changes. The score isn't listed on its own: the player sends the running score after every
+    // question (5%, 10%, … 100% for a 20-question quiz), so it's kept as the current score and in each status entry.
+    const record = entry => {
+      entry.at = Date.now() - startedAt;
+      entry.slide = currentSlide();
+      state.completion.history.push(entry);
+      sendState();
+      return entry;
+    };
+    function updateScore(t) {
+      if (lms.sent) return;
+      if (t == null) t = scorings().guessCurrentScoring();
+      if (!isQuiz(t)) return;
+      const pct = t.prop('PercentScore');
+      if (lms.lastScore === pct) return;
+      lms.lastScore = pct; lms.scored = t;
+      state.completion.score = pct;
+      sendState();
+    }
+    function send(status) {
+      if (status === 'incomplete') {
+        const was = state.completion.status;
+        state.completion.status = 'incomplete';
+        if (was && was !== 'incomplete') record({ kind: 'reset', status });
+        return;
+      }
+      if (!core.LMS_CALLS[status] || lms.sent) return;
+      lms.sent = true;
+      state.completion.status = status;
+      showAlert(record({ kind: 'status', status, reason: reason(), score: state.completion.score }));
+    }
+    function reportStatus(t) {
+      updateScore(t);
+      const s = scorings().getStatus();
+      if (lms.lastStatus !== s) { lms.lastStatus = s; send(s); }
+    }
+    const on = (name, fn) => DS.pubSub.on(name, function () { try { fn.apply(null, arguments); } catch (e) { fail('completion', e); } });
+    on(ev('status', 'UPDATED', 'status:updated'), t => reportStatus(t));
+    on(ev('course', 'COMPLETED', 'course:completed'), t => reportStatus(t));
+    on(ev('course', 'MANUALLY_COMPLETED', 'course:manuallyCompleted'), (t, scoring) => reportStatus(scoring));
+    on(ev('course', 'VIEWED', 'course:viewed'), () => send(scorings().getStatus()));
+    on(ev('quiz', 'RETRIED', 'quiz:retried'), t => { if (lms.scored === t) lms.sent = false; });
+    state.completion.watching = true;
+    // Already met before this started listening (such as a course resumed where it was complete)
+    if (scorings().getStatus() !== 'incomplete') reportStatus();
+    sendState();
+  }
+
+  // A message over the course when the status changes, like the SCORM Test LMS's. In its own shadow DOM, so the
+  // course's styles don't reach it; it never takes clicks meant for the course except on its own close button.
+  const ALERT_CSS = `
+    :host{all:initial}
+    .flash{--c:#137a43;position:fixed;inset:0;z-index:2147483646;pointer-events:none;opacity:0;
+      background:color-mix(in srgb,var(--c) 12%,transparent);box-shadow:inset 0 0 0 6px var(--c),inset 0 0 140px 40px color-mix(in srgb,var(--c) 50%,transparent)}
+    .flash.go{animation:pulse 2.2s ease-out}
+    @keyframes pulse{0%{opacity:0}10%{opacity:1}30%{opacity:.2}50%{opacity:1}70%{opacity:.2}85%{opacity:.8}100%{opacity:0}}
+    .toast{--c:#137a43;position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:2147483647;display:flex;align-items:flex-start;gap:12px;
+      width:max-content;max-width:min(560px,calc(100vw - 32px));padding:12px 12px 12px 16px;border-radius:10px;background:#fff;color:#1b2030;
+      border:2px solid var(--c);box-shadow:0 10px 30px rgba(0,0,0,.3);font:13px/1.45 'Segoe UI',system-ui,-apple-system,sans-serif}
+    .toast[hidden]{display:none}
+    .toast.go{animation:drop .35s ease-out}
+    @keyframes drop{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}
+    .fail{--c:#b42318}
+    .icon{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--c);color:#fff;font-size:18px;font-weight:700}
+    .from{font-size:11px;color:#5d6577;text-transform:uppercase;letter-spacing:.06em}
+    strong{display:block;font-size:16px;color:var(--c)}
+    .detail{font-size:12.5px;color:#5d6577;margin-top:2px}
+    details{margin-top:6px;font-size:12px}
+    summary{cursor:pointer;color:#5d6577;width:max-content}
+    summary:hover{color:#1b2030}
+    summary:focus-visible{outline:2px solid #1d5fd1;outline-offset:2px;border-radius:3px}
+    .calls{margin:4px 0 0 14px;display:grid;grid-template-columns:auto 1fr;gap:1px 10px;font-size:12px}
+    .calls span:nth-child(odd){color:#5d6577}
+    code{font:12px ui-monospace,'Cascadia Mono',Consolas,monospace;color:#1b2030;overflow-wrap:anywhere}
+    button{all:unset;flex:none;cursor:pointer;padding:0 6px;font-size:18px;line-height:24px;color:#5d6577;border-radius:4px}
+    button:hover{color:#1b2030;background:#eceef3}
+    button:focus-visible{outline:2px solid #1d5fd1}
+    @media (prefers-reduced-motion:reduce){.flash.go{animation:fade 2.5s ease-out}@keyframes fade{0%,40%{opacity:.9}100%{opacity:0}}.toast.go{animation:none}}`;
+  let alertParts = null, alertTimer = 0;
+  function showAlert(entry) {
+    try {
+      if (!alertParts) {
+        const host = document.createElement('storyline-review-tools-alert');
+        const root = host.attachShadow({ mode: 'open' });   // open so the tests can check it
+        root.innerHTML = '<style>' + ALERT_CSS + '</style><div class="flash"></div><div class="toast" role="status" aria-live="assertive" hidden>' +
+          '<span class="icon" aria-hidden="true"></span><div><div class="from">Storyline Review Tools</div><strong></strong><div class="detail"></div>' +
+          '<details><summary>LMS details</summary><div class="calls"></div></details></div>' +
+          '<button aria-label="Dismiss">×</button></div>';
+        (document.body || document.documentElement).appendChild(host);
+        alertParts = { flash: root.querySelector('.flash'), toast: root.querySelector('.toast'), icon: root.querySelector('.icon'),
+          title: root.querySelector('strong'), detail: root.querySelector('.detail'), calls: root.querySelector('.calls') };
+        root.querySelector('button').addEventListener('click', () => { alertParts.toast.hidden = true; clearTimeout(alertTimer); });
+      }
+      const ok = entry.status !== 'fail', p = alertParts;
+      const text = (el, s) => { el.textContent = s; return el; };
+      text(p.icon, ok ? '✓' : '✕');
+      text(p.title, { pass: 'Marked passed', complete: 'Marked complete', fail: 'Marked failed' }[entry.status]);
+      const m = Math.floor(entry.at / 60000), s = Math.floor(entry.at / 1000) % 60;
+      const from = [entry.reason ? 'From the ' + entry.reason : '', entry.slide && entry.slide.number ? 'on slide ' + entry.slide.number + (entry.slide.title ? ' “' + entry.slide.title + '”' : '') : ''].filter(Boolean).join(' ');
+      text(p.detail, (from ? from + ', ' : '') + m + ':' + String(s).padStart(2, '0') + ' into the session' + (entry.score != null ? ', score ' + entry.score + '%' : '') + '.');
+      const calls = core.LMS_CALLS[entry.status];
+      p.calls.textContent = '';
+      for (const [label, k] of [['SCORM 1.2', 'scorm12'], ['SCORM 2004', 'scorm2004'], ['xAPI', 'xapi']]) {
+        p.calls.appendChild(text(document.createElement('span'), label));
+        p.calls.appendChild(document.createElement('span')).appendChild(text(document.createElement('code'), calls[k]));
+      }
+      for (const el of [p.flash, p.toast]) { el.classList.remove('go', 'fail'); if (!ok) el.classList.add('fail'); void el.offsetWidth; el.classList.add('go'); }
+      p.toast.hidden = false;
+      clearTimeout(alertTimer);
+      alertTimer = setTimeout(() => { p.toast.hidden = true; }, 15000);
+    } catch (e) { fail('alert', e); }
+  }
 
   // After data.js arrives: read every slide file (as data, never run) for the answer key and the lock counts.
   // The player loads slides only as they're shown, so without this the panel would only know about slides already seen.
@@ -69,6 +223,7 @@
     }));
     updateLocks(true);
     updateQuiz();
+    updateCompletion();
     sendState();
   }
 
@@ -122,6 +277,7 @@
       let n = core.changeSlideLocks(published, settings);
       updateLocks(false);
       updateQuiz();
+      updateCompletion();
       if (settings.answers) {
         // Question slides embedded in data.js
         const vars = {};
@@ -141,7 +297,7 @@
     if (kind === 'slide') {
       const slide = JSON.parse(json);
       const file = fileOfSlide.get(slide.id);
-      if (file && !slideCache.has(file)) { slideCache.set(file, JSON.parse(json)); lockCounts.set(file, core.countLocks(slide)); }
+      if (file && !slideCache.has(file)) { slideCache.set(file, JSON.parse(json)); lockCounts.set(file, core.countLocks(slide)); updateCompletion(); }
       let n = core.changeSlideLocks(slide, settings);
       if (n) { state.changed.nav += n; state.changed.slides++; }
       if (settings.answers) {
@@ -166,6 +322,7 @@
     get() { return wrapped; },
     set(fn) {
       if (typeof fn !== 'function') { wrapped = fn; return; }
+      if (!state.player) watchCompletion();
       state.player = true;
       wrapped = function (kind, json) {
         let out = json;

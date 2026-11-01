@@ -20,14 +20,16 @@
     wanted = norm(settings);
     try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(wanted)); } catch (e) {}
   }
-  // Reload when this page load used other settings. Guarded so a browser that blocks storage can't loop:
-  // at most 3 reloads in 20 seconds.
+  // Reload when this page load used other settings. Guarded so a browser that blocks storage can't loop: at most
+  // 3 reloads in 20 seconds for the same settings. Reloads for settings the user has since changed don't count, so
+  // turning options on and off quickly still reloads each time.
   function reloadIfOutOfDate() {
     if (reloading || !wanted || !started || same(wanted, started)) return;
+    const key = JSON.stringify(wanted);
     let recent = [];
-    try { recent = JSON.parse(sessionStorage.getItem(RELOADS_KEY) || '[]').filter(t => Date.now() - t < 20000); } catch (e) {}
-    if (recent.length >= 3) return;
-    try { sessionStorage.setItem(RELOADS_KEY, JSON.stringify(recent.concat(Date.now()))); } catch (e) {}
+    try { recent = JSON.parse(sessionStorage.getItem(RELOADS_KEY) || '[]').filter(r => r && Date.now() - r.t < 20000); } catch (e) {}
+    if (recent.filter(r => r.w === key).length >= 3) return;
+    try { sessionStorage.setItem(RELOADS_KEY, JSON.stringify(recent.concat({ t: Date.now(), w: key }))); } catch (e) {}
     reloading = true;
     location.reload();
   }

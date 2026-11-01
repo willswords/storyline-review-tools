@@ -29,7 +29,7 @@ Or one or more by name, for example:
 node tests/run-all.js navigation answers
 ```
 
-All four take about three minutes. Screenshots go to `tests/output/` (not in git).
+All five take about three and a half minutes. Screenshots go to `tests/output/` (not in git).
 
 ## The tests
 
@@ -38,7 +38,8 @@ All four take about three minutes. Screenshots go to `tests/output/` (not in git
 | `test-navigation.js` | `navigation`: a "restricted" menu, and triggers disabling Next/Prev | With the settings off, the course is exactly as published: the menu locks slides, and the hook counts the locks without changing anything. With them on, the menu is free, Next is enabled, and it moves on. |
 | `test-answers.js` | `answers`: courses with a multiple-choice or true/false quiz | Goes to the first question through the menu. With the settings on, the correct choice is selected and nothing else is; with them off, nothing is selected. |
 | `test-question-types.js` | `questionTypesPackage`: a published course (.zip or folder), served locally | Every question type that can be pre-filled opens filled in, and Storyline's feedback after Submit says it's correct. |
-| `test-extension.js` | `extension`: a "restricted" menu and a quiz | The extension itself, loaded into Chrome: the side panel finds the course, its notes and answer list are right, its checkboxes reload the course with the settings (menu free, toolbar badge ON), and turning them off goes back to the published course. |
+| `test-completion.js` | `completion`: three courses, tracked by a Complete Course trigger (`trigger`), slides viewed (`views`) and a quiz result (`quiz`) | The completion section reads each course's tracking and where it's met. Playing each, the status is reported on the right slide and for the right reason; the quiz is failed (Failed, score 0%), retried (back to Incomplete) and passed (Passed, score 100%). |
+| `test-extension.js` | `extension`: a "restricted" menu and a quiz | The extension itself, loaded into Chrome: the side panel finds the course, its notes and answer list are right, its checkboxes reload the course with the settings (menu free, toolbar badge ON), and turning them off goes back to the published course. **Unlock all navigation** turns on only the options the course can use, shows a dash when some are on, and turns them all off again. |
 
 The first three inject `src/core.js` and `src/hook.js` into the course frame the way the extension's content script would, which makes them faster to run and works in Edge. `test-extension.js` loads the whole extension.
 

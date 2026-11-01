@@ -5,6 +5,11 @@
     "A Review link to a course with a multiple-choice or true/false quiz",
     "(more courses with quizzes, optional)"
   ],
-  "extension": "A Review link to a course with a \"restricted\" menu and a quiz (used for the full extension test)",
+  "completion": {
+    "trigger": "A Review link to a 2-slide course tracked by a Complete Course trigger on slide 2 (when its timeline starts)",
+    "views": "A Review link to a 2-slide course tracked by slides viewed (all 2)",
+    "quiz": "A Review link to a course tracked by a quiz result: slide 1, one true/false question (answer True) with a 100% pass mark, a results slide with Retry Quiz"
+  },
+  "extension":"A Review link to a course with a \"restricted\" menu and a quiz (used for the full extension test)",
   "questionTypesPackage": "A published Storyline course (.zip or an unzipped folder) with fill-in, numeric and hotspot questions"
 }

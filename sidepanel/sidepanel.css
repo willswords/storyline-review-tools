@@ -42,10 +42,37 @@ button.small:hover{border-color:var(--accent);color:var(--accent)}
 .chk.sl{margin-top:8px;font-weight:600}
 .chk input{margin:0;accent-color:var(--accent)}
 .chk:has(input:disabled){color:var(--muted);cursor:default}
+.sl-group{margin-left:22px;padding-left:10px;border-left:2px solid var(--border)}
+.sl-group .chk.sl{margin-top:6px}
 .sl-note{font:11px/1.5 var(--mono);color:var(--muted);margin:2px 0 0 22px;word-break:break-word}
 .sl-note .changed{color:var(--ok)}
 .sl-foot{margin-top:10px;font-size:11px;color:var(--muted)}
 
+.sl-head{margin-top:12px;font-size:12px;font-weight:600}
+.comp-now{display:flex;align-items:flex-start;gap:8px}
+.comp-now .badge{flex:none;border-radius:999px;padding:1px 9px;font-weight:600;font-size:12px;background:var(--surface2);color:var(--muted)}
+.comp-now .badge.ok{background:var(--ok);color:var(--surface)}
+.comp-now .badge.fail{background:var(--err);color:var(--surface)}
+.comp-now .when{font-size:12px;color:var(--muted)}
+.lms-details{margin-top:8px;font-size:12px}
+.lms-details summary{cursor:pointer;color:var(--muted);width:max-content}
+.lms-details summary:hover{color:var(--text)}
+.lms-details summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.comp-calls{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:4px 0 0 14px;font-size:11px}
+.comp-calls span:nth-child(odd){color:var(--muted)}
+.comp-calls code,#compHow code{font-family:var(--mono);font-size:11px;overflow-wrap:anywhere}
+.comp-history{margin:8px 0 0;padding:0 0 0 18px;font-size:12px;display:flex;flex-direction:column;gap:3px}
+.comp-history:empty{display:none}
+.comp-history li::marker{color:var(--muted);font-size:11px}
+.comp-history .t{font-family:var(--mono);font-size:11px;color:var(--muted);margin-right:4px}
+.comp-history .ok{color:var(--ok);font-weight:600}
+.comp-history .fail{color:var(--err);font-weight:600}
+#compHow{font-size:12px}
+#compHow ul{margin:4px 0 0;padding-left:18px}
+#compHow li{margin-bottom:4px}
+#compHow .where{color:var(--muted);font-size:11px}
+#compHow .rep{color:var(--muted);margin-top:6px}
+#compHow .problem{color:var(--err);background:var(--err-bg);border-radius:6px;padding:5px 8px;margin-top:6px}
 .quiz-info{font-size:12px;color:var(--muted);margin-bottom:8px}
 .quiz-info code{font-family:var(--mono);font-size:11px}
 #quizList{margin:0;padding:0 0 0 24px;font-size:12px;display:flex;flex-direction:column;gap:8px}

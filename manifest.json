@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Storyline Review Tools",
-  "version": "1.0.0",
-  "description": "Unlock navigation and pre-select correct quiz answers in Storyline courses on Articulate Review, to review them faster.",
+  "version": "1.1.0",
+  "description": "Unlock navigation, pre-select correct quiz answers and check when Storyline courses on Articulate Review will complete.",
   "minimum_chrome_version": "116",
   "permissions": ["storage", "sidePanel"],
   "background": { "service_worker": "src/background.js" },

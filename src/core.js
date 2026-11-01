@@ -271,13 +271,143 @@
     return n;
   }
 
+  // ── 4. Completion: when the course reports to an LMS, and what it reports ──
+  // data.js "scorings" holds one entry per tracking option ticked in Storyline's Tracking settings:
+  //   "view"   a number of slides viewed (viewThreshold; slides sharing a view group count once)
+  //   "quiz"   a quiz result (scoreRefs → data.quizzes); reported once a results slide submits the quiz (setquizcomplete)
+  //   "action" Complete Course triggers ({"kind":"set_course_status","status":true}); the player ignores those triggers without it
+  // passStatus/failStatus are the words of the Reporting setting: "pass", "complete", "fail" or "incomplete".
+  // The player counts the course complete when any one is met; the first met, in this order, gives the status.
+  const STATUS_WORDS = { pass: 'Passed', complete: 'Completed', fail: 'Failed', incomplete: 'Incomplete' };
+  // What the player's SCORM driver (lms/scormdriver.js) sets for each status, and the xAPI statement it sends
+  const LMS_CALLS = {
+    pass: { scorm12: 'cmi.core.lesson_status = "passed"', scorm2004: 'cmi.success_status = "passed", cmi.completion_status = "completed"', xapi: 'a “passed” statement' },
+    fail: { scorm12: 'cmi.core.lesson_status = "failed"', scorm2004: 'cmi.success_status = "failed", cmi.completion_status = "completed"', xapi: 'a “failed” statement' },
+    complete: { scorm12: 'cmi.core.lesson_status = "completed"', scorm2004: 'cmi.completion_status = "completed"', xapi: 'a “completed” statement' },
+    incomplete: { scorm12: 'cmi.core.lesson_status = "incomplete"', scorm2004: 'cmi.completion_status = "incomplete", cmi.success_status = "unknown"', xapi: 'no statement' }
+  };
+  const SCORE_CALLS = pct => ({ scorm12: 'cmi.core.score.raw = ' + pct, scorm2004: 'cmi.score.raw = ' + pct + ', cmi.score.scaled = ' + Math.round(pct) / 100, xapi: 'result.score.scaled ' + Math.round(pct) / 100 });
+
+  const plain = s => String(s == null ? '' : s).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
+  // Slides by id, numbered as the course menu numbers them ("1.3" is scene 1, slide 3)
+  function slideIndex(data) {
+    const map = new Map();
+    for (const scene of data.scenes || []) {
+      if (scene.isMessageScene) continue;
+      for (const s of scene.slides || []) map.set(s.id, { id: s.id, number: scene.sceneNumber + '.' + s.slideNumberInScene, title: plain(s.title), slide: s });
+    }
+    return map;
+  }
+  // The slide id in a player path such as "_player.<scene>.<slide>"
+  const slideOf = (index, path) => index.get(String(path || '').split('.').pop()) || null;
+
+  // When a trigger runs, in Storyline's words
+  function describeWhen(ctx) {
+    const obj = ctx.object, d = obj && obj.data;
+    const name = obj && (plain((d && d.textdata && d.textdata.altText) || (d && d.vectorData && d.vectorData.altText) || obj.accText) || obj.id);
+    const on = {
+      onslidestart: 'when the timeline starts', ontimelinestart: 'when the timeline starts', ontransitionin: 'as the slide appears',
+      ontimelinecomplete: 'when the timeline ends', ontimelineend: 'when the timeline ends', onsubmitslide: 'when Submit is pressed',
+      onnextslide: 'when Next is pressed', onprevslide: 'when Prev is pressed', onrelease: name ? 'when “' + name + '” is clicked' : 'when an object is clicked',
+      onclick: name ? 'when “' + name + '” is clicked' : 'when an object is clicked'
+    }[ctx.event];
+    let when = on || (ctx.event === 'ontimelinetick' ? 'at ' + Math.round((ctx.time || 0) / 100) / 10 + ' s on the timeline' : ctx.event ? 'on “' + ctx.event + '”' : 'from a trigger group');
+    if (ctx.layer) when += ' (on a layer)';
+    if (ctx.conditional) when += ', if its conditions are met';
+    return when;
+  }
+  // Every action of the given kinds in a slide (or other JSON), with the trigger it belongs to
+  function findActions(rootObj, kinds) {
+    const out = [];
+    (function visit(o, ctx) {
+      if (Array.isArray(o)) { for (const x of o) visit(x, ctx); return; }
+      if (!o || typeof o !== 'object') return;
+      let c = ctx;
+      if (o.kind === 'slidelayer') c = Object.assign({}, c, { layer: !o.isBaseLayer });
+      else if (typeof o.kind === 'string' && /^on/.test(o.kind)) c = Object.assign({}, c, { event: o.kind, time: o.time });
+      else if (o.kind === 'if_action') c = Object.assign({}, c, { conditional: true });
+      else if (o !== rootObj && Array.isArray(o.events) && o.id) c = Object.assign({}, c, { object: o });
+      if (kinds.includes(o.kind)) out.push(Object.assign({ action: o }, c));
+      for (const k in o) if (o[k] && typeof o[k] === 'object') visit(o[k], c);
+    })(rootObj, {});
+    return out;
+  }
+
+  // The tracking options, where in the course each can be met, and what would stop the course completing.
+  // slideData(file) as for buildQuizKey; until every slide file is read, triggers on unread slides aren't listed yet.
+  function completionInfo(data, slideData) {
+    const scorings = (data.scorings && data.scorings.length ? data.scorings : data.scoring ? [data.scoring] : []);
+    const index = slideIndex(data);
+    const quizName = id => { const q = (data.quizzes || []).find(x => x.id === id); return q ? plain(q.lmstext) || id : id; };
+    // Complete/Incomplete Course triggers and results slides, on every slide that can be read
+    const courseTriggers = [], results = [];
+    let unread = 0;
+    for (const s of index.values()) {
+      const sd = s.slide.html5url ? slideData(s.slide.html5url) : s.slide.slideLayers ? s.slide : null;
+      if (!sd) { unread++; continue; }
+      for (const f of findActions(sd, ['set_course_status', 'setquizcomplete'])) {
+        const where = { number: s.number, title: s.title, when: describeWhen(f) };
+        if (f.action.kind === 'set_course_status') courseTriggers.push(Object.assign(where, { complete: f.action.status !== false }));
+        else results.push(Object.assign(where, { quiz: String(f.action.objRef && f.action.objRef.value || '').split('.').pop() }));
+      }
+    }
+    // Player triggers (data.js), such as one on the player's Finish button
+    for (const f of findActions({ events: data.events, actionGroups: data.actionGroups }, ['set_course_status']))
+      courseTriggers.push({ number: '', title: 'Player trigger', when: describeWhen(f), complete: f.action.status !== false });
+
+    // Slides that count as viewed: one per view group, plus the questions each question-bank draw shows
+    const groups = new Set();
+    let drawn = 0;
+    for (const s of index.values()) if (s.slide.trackViews === true) groups.add(s.slide.viewGroupId || s.slide.id);
+    walk(data.scenes, o => { if (o.kind === 'slidedraw') drawn += o.shuffle && o.shufflecount > 0 ? o.shufflecount : (o.sliderefs || []).length; });
+    const counted = groups.size + drawn;
+
+    const problems = [];
+    const hasAction = scorings.some(s => s.type === 'action' || s.type === 'trigger');
+    const criteria = scorings.map(s => {
+      if (s.type === 'quiz') {
+        const refs = s.scoreRefs || [];
+        const names = refs.map(r => '“' + quizName(r.ref) + '”').join(' and ') || 'a quiz';
+        const by = results.filter(r => refs.some(x => x.ref === r.quiz));
+        if (refs.length && !by.length && !unread) problems.push('No results slide submits ' + names + ', so its result is never reported.');
+        return { kind: 'quiz', text: s.passPercent > 0 ? 'Pass the quiz ' + names + ' with ' + s.passPercent + '% or more' : 'Finish the quiz ' + names + ' (pass mark 0%, so any score passes)',
+          detail: 'Reported when a results slide submits it', where: by };
+      }
+      if (s.type === 'action' || s.type === 'trigger') {
+        const by = courseTriggers.filter(t => t.complete);
+        if (!by.length && !unread) problems.push('Tracking uses Complete Course triggers, but no slide has one, so the course never completes.');
+        return { kind: 'trigger', text: 'Reach a Complete Course trigger', where: by };
+      }
+      if (s.type === 'view') {
+        const from = drawn ? ', including ' + drawn + ' drawn from a question bank' : '';
+        if (counted && s.viewThreshold > counted) problems.push('Tracking needs ' + s.viewThreshold + ' slides viewed, but only ' + counted + ' count as viewed, so the course never completes.');
+        return { kind: 'view', text: counted && s.viewThreshold >= counted ? 'View all ' + counted + ' slides' + (from ? ' (' + from.slice(2) + ')' : '')
+          : 'View at least ' + s.viewThreshold + ' slide' + (s.viewThreshold === 1 ? '' : 's') + (counted ? ' (of the ' + counted + ' that count' + from + ')' : ''),
+          detail: 'Reported as the slide that reaches the count starts', where: [] };
+      }
+      return { kind: s.type, text: 'Storyline tracking type “' + s.type + '”', where: [] };
+    });
+    if (!scorings.length) problems.push('No tracking option is set, so the course never reports completion.');
+    const ignored = courseTriggers.filter(t => t.complete);
+    if (ignored.length && !hasAction) problems.push('Complete Course trigger(s) on ' + ignored.map(t => t.number ? 'slide ' + t.number : t.title).join(', ') +
+      ', but tracking doesn’t use triggers, so the player ignores them.');
+    const s0 = scorings[0];
+    const incompleteTriggers = courseTriggers.filter(t => !t.complete);
+    return {
+      criteria, any: criteria.length > 1, problems, checked: !unread, counted,
+      reports: s0 ? { met: s0.passStatus, notMet: s0.failStatus, metWord: STATUS_WORDS[s0.passStatus] || s0.passStatus, notMetWord: STATUS_WORDS[s0.failStatus] || s0.failStatus } : null,
+      incompleteTriggers: hasAction ? incompleteTriggers : []
+    };
+  }
+
   const QUESTION_TYPES = { multiplechoice: 'Multiple choice', multipleresponse: 'Multiple response', truefalse: 'True/false', fillin: 'Fill in the blank',
     wordbank: 'Word bank', matching: 'Matching', matchingdropdown: 'Matching (drop-down)', sequence: 'Sequence', sequencedragdrop: 'Sequence (drag and drop)',
     numeric: 'Numeric', hotspot: 'Hotspot', dragdrop: 'Drag and drop', likert: 'Likert scale', essay: 'Essay', shortanswer: 'Short answer',
     rankingdragdrop: 'Ranking', howmany: 'How many', pickone: 'Pick one', pickmany: 'Pick many', freeform: 'Freeform' };
 
   const api = { readProvided, frameInfo, changeFrame, countLocks, changeSlideLocks, slideFiles, questionSlides,
-    buildQuizKey, applyAnswers, questionText, describeCondition, numberFor, QUESTION_TYPES, NAV_CONTROLS };
+    buildQuizKey, applyAnswers, questionText, describeCondition, numberFor, QUESTION_TYPES, NAV_CONTROLS,
+    completionInfo, slideIndex, slideOf, findActions, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else Object.defineProperty(root, '__storylineReviewCore', { value: api });   // hidden from the course's own scripts' enumeration
 })(typeof globalThis !== 'undefined' ? globalThis : this);

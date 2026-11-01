@@ -131,6 +131,15 @@ For completion, it reads `data.js`'s `scorings` (the Tracking settings) and find
 | `sidepanel/` | The side panel. |
 | `icons/` | The toolbar icon. |
 | `tests/` | Automated tests in headless Edge and Chrome; see [tests/README.md](tests/README.md). |
+| `pack.ps1` | Builds `storyline-review-tools.zip` for the Chrome Web Store and Edge Add-ons. |
+
+## Packaging for the stores
+
+```bash
+powershell -ExecutionPolicy Bypass -File pack.ps1
+```
+
+This builds `storyline-review-tools.zip` with only what the extension runs: `manifest.json`, `src/`, `sidepanel/`, `icons/` and `LICENSE`. It checks that every file `manifest.json` names is included. Don't zip the folder by hand: that would take in `.git`, the tests, and `tests/courses.json` with your Review links. The zip isn't kept in git.
 
 ## Testing
 

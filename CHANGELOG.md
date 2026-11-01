@@ -10,6 +10,7 @@
   - Follows the Storyline player's own status events and the rules of its SCORM code, so the moments match a published course. Always on; changes nothing in the course.
 - **Unlock all navigation:** one checkbox over the three navigation options (free navigation, seekbar, Next/Prev). It turns on the ones the course has something to unlock, in one save, so the course reloads once; it shows a dash when only some are on.
 - **Changing options quickly** always reloads the course with the latest settings. The guard against a reload loop (3 reloads in 20 seconds) now only counts reloads for the same settings, so it no longer blocks real changes.
+- **`pack.ps1`** builds the store zip with only the extension's own files. The zip is no longer kept in git: the 1.0.0 zip in the repository had been made from the whole folder, including `.git`, the tests, test screenshots and `tests/courses.json`.
 - **Tests:** `test-completion.js` plays a course for each tracking option (trigger, slides viewed, and a quiz failed, retried and passed); the extension test checks the new section and Unlock all navigation.
 
 ## 1.0.0 (2026-10-24)

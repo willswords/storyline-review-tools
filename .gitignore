@@ -2,6 +2,8 @@
 tests/courses.json
 # Screenshots from the tests
 tests/output/
+# The store package: built by pack.ps1 when needed
+storyline-review-tools.zip
 node_modules/
 videobanner-refined.png
 IMXDaLPvmHPNE.png

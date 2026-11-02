@@ -13,15 +13,15 @@
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {}; } catch (e) {}
   // The settings this page load uses (sent with every state, so bridge.js can tell if they're out of date)
-  const settings = { freeNav: !!saved.freeNav, seekbar: !!saved.seekbar, nav: !!saved.nav, answers: !!saved.answers };
+  const settings = { freeNav: !!saved.freeNav, seekbar: !!saved.seekbar, nav: !!saved.nav, unhide: !!saved.unhide, answers: !!saved.answers };
 
   // What the side panel shows: what the course does, and what was changed
   const state = {
     player: false,          // the Storyline player has started in this frame
     settings,
     title: '',
-    frame: null,            // { flow, seekbar } as published
-    locks: null,            // { nav, seek, slidesWithNav, slideFiles, checked } across all slides
+    frame: null,            // { flow, seekbar, hidesNav } as published
+    locks: null,            // { nav, seek, slidesWithNav, slidesHidingNav, slideFiles, checked } across all slides
     quiz: null,             // the answer key (core.buildQuizKey)
     changed: { frame: 0, nav: 0, seek: 0, answers: 0, slides: 0 },
     // How the course completes (core.completionInfo), and what it has reported in this session
@@ -32,7 +32,8 @@
   let data = null;                      // data.js, as published
   const slideCache = new Map();         // html5url → slide JSON as published
   const fileOfSlide = new Map();        // slide id → html5url
-  const lockCounts = new Map();         // html5url (or '#data' for slides inside data.js) → { nav, seek }
+  const lockCounts = new Map();         // html5url (or '#data' for slides inside data.js) → { nav, seek, layouts }
+  const lockInfo = slide => Object.assign(core.countLocks(slide), { layouts: core.slideLayouts(slide) });
 
   // ── Talking to bridge.js (the extension side), through events on the document ──
   let sendTimer = 0;
@@ -47,9 +48,13 @@
   const fail = (where, e) => { state.errors.push(where + ': ' + (e && e.message || e)); sendState(); };
 
   function updateLocks(done) {
-    let nav = 0, seek = 0, slidesWithNav = 0;
-    for (const c of lockCounts.values()) { nav += c.nav; seek += c.seek; if (c.nav) slidesWithNav++; }
-    state.locks = { nav, seek, slidesWithNav, slideFiles: data ? core.slideFiles(data).length : 0, checked: !!done };
+    let nav = 0, seek = 0, slidesWithNav = 0, slidesHidingNav = 0;
+    const hiding = new Set((state.frame && state.frame.hidesNav) || []);
+    for (const c of lockCounts.values()) {
+      nav += c.nav; seek += c.seek; if (c.nav) slidesWithNav++;
+      if (c.layouts.some(l => hiding.has(l))) slidesHidingNav++;   // the slide's Player features hide Prev or Next
+    }
+    state.locks = { nav, seek, slidesWithNav, slidesHidingNav, slideFiles: data ? core.slideFiles(data).length : 0, checked: !!done };
   }
   function updateQuiz() {
     if (data) state.quiz = core.buildQuizKey(data, f => slideCache.get(f) || null);
@@ -217,7 +222,7 @@
         try {
           const r = await fetch(new URL(f, location.href), { credentials: 'same-origin' });
           const p = r.ok ? core.readProvided(await r.text()) : null;
-          if (p && p.kind === 'slide' && !slideCache.has(f)) { slideCache.set(f, p.data); lockCounts.set(f, core.countLocks(p.data)); }
+          if (p && p.kind === 'slide' && !slideCache.has(f)) { slideCache.set(f, p.data); lockCounts.set(f, lockInfo(p.data)); }
         } catch (e) { /* counted as unchecked; the slide is still read when the player loads it */ }
       }
     }));
@@ -273,8 +278,12 @@
       for (const scene of data.scenes || []) for (const s of scene.slides || []) if (s.html5url) fileOfSlide.set(s.id, s.html5url);
       for (const s of (data.slideBank && data.slideBank.slides) || []) if (s.html5url) fileOfSlide.set(s.id, s.html5url);
       // Slides embedded in data.js have their triggers here
-      lockCounts.set('#data', core.countLocks(published));
+      lockCounts.set('#data', lockInfo(published));
       let n = core.changeSlideLocks(published, settings);
+      // Embedded slides whose Player features hide Next/Prev: the triggers the buttons need
+      if (settings.unhide) for (const scene of published.scenes || []) for (const s of scene.slides || []) {
+        if (!s.html5url && s.slideLayers) n += core.addMissingNav(s, core.nextSlidePath(data, s.id), core.hiddenNav(s, state.frame));
+      }
       updateLocks(false);
       updateQuiz();
       updateCompletion();
@@ -297,8 +306,10 @@
     if (kind === 'slide') {
       const slide = JSON.parse(json);
       const file = fileOfSlide.get(slide.id);
-      if (file && !slideCache.has(file)) { slideCache.set(file, JSON.parse(json)); lockCounts.set(file, core.countLocks(slide)); updateCompletion(); }
+      if (file && !slideCache.has(file)) { slideCache.set(file, JSON.parse(json)); lockCounts.set(file, lockInfo(slide)); updateCompletion(); }
       let n = core.changeSlideLocks(slide, settings);
+      // Next/Prev shown on a slide whose Player features hide them: the triggers the buttons need
+      if (settings.unhide && data) n += core.addMissingNav(slide, core.nextSlidePath(data, slide.id), core.hiddenNav(slide, state.frame));
       if (n) { state.changed.nav += n; state.changed.slides++; }
       if (settings.answers) {
         const applies = answersFor(slide.id);

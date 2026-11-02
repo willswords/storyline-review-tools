@@ -6,7 +6,8 @@ A Chrome and Edge extension for reviewing Articulate Storyline courses on **Arti
 |---|---|
 | **Free navigation (menu)** | Opens the course with the menu set to "free", so you can jump to any slide, including ones not viewed yet. |
 | **Unlock seekbar** | Makes the seekbar draggable, if the course makes it read-only. |
-| **Unlock Next/Prev buttons** | Keeps Next and Prev enabled on slides whose triggers disable them (for example "disable Next until the timeline ends"). |
+| **Unlock Next/Prev buttons** | Keeps Next and Prev enabled on slides whose triggers disable them (for example "disable Next until the timeline ends"). The buttons are there but greyed out. |
+| **Add Next/Prev buttons where turned off** | Shows Next and Prev on slides whose Player features (slide properties) leave them out, including question slides, where Next appears beside Submit. Next goes to the next slide in the menu, Prev goes back. |
 | **Pre-select correct quiz answers** | Opens question slides with the correct answer already filled in, so you only press Submit. |
 
 The side panel also lists the course's **quiz answers**, as the course scores them, and shows **when the course completes**: what its tracking needs, and the status it reports as you play it (see [Completion](#completion)).
@@ -37,13 +38,15 @@ Free navigation (menu)
   Menu navigation is "restricted" → opened as "free".
 Unlock Next/Prev buttons
   63 trigger(s) in 21 slide(s) disable Next/Prev → kept enabled.
+Add Next/Prev buttons where turned off
+  42 slide(s) turn off Next/Prev in their Player features → added; Next goes to the next slide, Prev goes back.
 Pre-select correct quiz answers
   All 10 question(s) open with the correct answer filled in; you still press Submit.
 ```
 
 An option is greyed out when the course has nothing for it to unlock.
 
-**Unlock all navigation** turns on (or off) all three navigation options at once, skipping any that are greyed out, and reloads the course once. It shows a dash when only some of them are on; clicking it then turns them all on.
+**Unlock all navigation** turns on (or off) all four navigation options at once, skipping any that are greyed out, and reloads the course once. It shows a dash when only some of them are on; clicking it then turns them all on.
 
 The options apply to **every Review course you open** until you turn them off. While any is on, the toolbar button shows **ON**. Turn them off before reviewing a course as a learner would see it.
 
@@ -103,8 +106,8 @@ A Storyline course loads its content as data files (`html5/data/js/frame.js`, `d
 
 The extension runs a small script in that frame before the Storyline player starts. It wraps `globalProvideData`, and changes each file's content as it arrives:
 
-- `frame.js`: the menu's `flow` setting becomes `"free"`; the seekbar's `readonly` settings become `false`.
-- Slide files: triggers that disable Next, Prev or the seekbar (`enable_window_control` with `"enable": false`) become `"enable": true`.
+- `frame.js`: the menu's `flow` setting becomes `"free"`; the seekbar's `readonly` settings become `false`. For Add Next/Prev buttons where turned off, in the control layouts slides pick with their Player features (`controlLayouts`), `"previous"` and `"next"` (and their swipes) become `true`.
+- Slide files: triggers that disable Next, Prev or the seekbar (`enable_window_control` with `"enable": false`) become `"enable": true`. For Add Next/Prev buttons where turned off, a slide that hides a button is published without the trigger it runs, so it gets Storyline's usual one: Next goes to the next slide in the menu's order, Prev goes back.
 - Question slides: the correct choices start selected, a hotspot's click starts recorded. Fill-in and numeric answers are set through the player's own `SetVar`.
 
 To build the answer key and the counts in the panel, it reads the course's slide files (the same files the course loads anyway). Nothing is sent anywhere else.
@@ -116,7 +119,7 @@ For completion, it reads `data.js`'s `scorings` (the Tracking settings) and find
 ## What it doesn't unlock
 
 - **Slides whose Next has no destination.** Some slides are designed to move on through their own buttons. Use free navigation to jump past them from the menu.
-- **Hidden buttons**, and on-slide buttons, tabs or layers that wait for a variable. They're part of the slide, not the player's controls.
+- **On-slide buttons that are hidden**, and on-slide buttons, tabs or layers that wait for a variable. They're part of the slide, not the player's controls.
 - **Courses that aren't on Articulate Review.** It only runs on Review's course frames.
 
 ## Files

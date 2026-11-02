@@ -15,7 +15,7 @@
   <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>Storyline testing</button><span class="grow"></span>
     <button id="btnReload" class="small" title="Reload the course in this tab" hidden>Reload course</button></h2>
   <div class="sl-intro">Changes are made in this browser as the course loads, so the course on Review isn’t changed. Each change reloads the course.</div>
-  <label class="chk sl"><input type="checkbox" id="slAllNav" aria-controls="slFree slSeek slNav"> Unlock all navigation</label>
+  <label class="chk sl"><input type="checkbox" id="slAllNav" aria-controls="slFree slSeek slNav slUnhide"> Unlock all navigation</label>
   <div class="sl-group" role="group" aria-label="Navigation options">
     <label class="chk sl"><input type="checkbox" id="slFree"> Free navigation (menu)</label>
     <div class="sl-note" id="slFreeNote"></div>
@@ -23,6 +23,8 @@
     <div class="sl-note" id="slSeekNote"></div>
     <label class="chk sl"><input type="checkbox" id="slNav"> Unlock Next/Prev buttons</label>
     <div class="sl-note" id="slNavNote"></div>
+    <label class="chk sl"><input type="checkbox" id="slUnhide"> Add Next/Prev buttons where turned off</label>
+    <div class="sl-note" id="slUnhideNote"></div>
   </div>
   <label class="chk sl"><input type="checkbox" id="slAnswers"> Pre-select correct quiz answers</label>
   <div class="sl-note" id="slAnswersNote"></div>

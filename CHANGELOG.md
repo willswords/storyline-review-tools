@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 (2026-11-02)
+
+- **Add Next/Prev buttons where turned off**, a new option next to Unlock Next/Prev buttons. Unlock keeps buttons enabled that triggers disable (greyed out); Add Next/Prev buttons where turned off shows buttons that a slide's Player features leave out (a control layout in `frame.js` with `"previous": false` or `"next": false`), question slides included, where Next appears beside Submit. Those slides are published without a Next or Prev trigger, so they get Storyline's usual ones: Next goes to the next slide in the menu, Prev goes back. The panel counts them, for example "42 slide(s) turn off Next/Prev in their Player features". Unlock all navigation includes it.
+- **Tests:** the navigation test checks a course whose slides hide Next/Prev; the extension test waits for the slide check before using Unlock all navigation.
+
 ## 1.1.0 (2026-10-31)
 
 - **Completion**, a new side panel section, to check a course will complete correctly once it's published for an LMS:

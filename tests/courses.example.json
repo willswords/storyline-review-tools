@@ -5,6 +5,7 @@
     "A Review link to a course with a multiple-choice or true/false quiz",
     "(more courses with quizzes, optional)"
   ],
+  "hiddenNav": "A Review link to a course whose slide 1.1 hides Prev and Next, and slide 1.3 hides Next, in their Player features (optional)",
   "completion": {
     "trigger": "A Review link to a 2-slide course tracked by a Complete Course trigger on slide 2 (when its timeline starts)",
     "views": "A Review link to a 2-slide course tracked by slides viewed (all 2)",

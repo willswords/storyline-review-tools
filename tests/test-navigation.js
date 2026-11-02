@@ -39,5 +39,31 @@ const LOCKED_ITEMS = `[...document.querySelectorAll('#outline-content .cs-listit
       check('no errors from the extension’s scripts', !c.errors.some(e => /storylineReview|core\.js|hook\.js/i.test(e)), c.errors.slice(0, 2).join(' | ') || 'none');
     } finally { c.close(); }
   }
+
+  // Add Next/Prev buttons where turned off, on slides whose Player features hide them (course "hiddenNav": slide 1.1 hides both, 1.3 hides Next)
+  const hiddenUrl = courses().hiddenNav;
+  if (hiddenUrl) for (const on of [false, true]) {
+    console.log(`--- hidden Next/Prev, settings ${on ? 'on' : 'off'}`);
+    const c = await openCourse(hiddenUrl, { unhide: on });
+    try {
+      const st = await c.ready();
+      check('slides hiding Next/Prev are counted', st && st.locks.slidesHidingNav > 0, st && st.locks.slidesHidingNav);
+      await sleep(2500);
+      const shown = sel => c.ev(`(() => { const e = document.querySelector('${sel}'); if (!e) return false; const r = e.getBoundingClientRect(), s = getComputedStyle(e); return !!r.width && s.display !== 'none' && s.visibility !== 'hidden'; })()`);
+      const num = () => c.ev(`(() => { try { return DS.windowManager.getCurrentWindow().getCurrentSlide().get('slideNumberInScene'); } catch (e) { return null; } })()`);
+      const press = async (sel, to) => { for (let i = 0; i < 3; i++) { await c.click(sel); if (await c.waitFor(`(() => { try { return DS.windowManager.getCurrentWindow().getCurrentSlide().get('slideNumberInScene') === ${to}; } catch (e) { return false; } })()`, 5000)) return true; } return false; };
+      if (!on) {
+        check('slide 1.1 shows neither Next nor Prev, as published', !(await shown('#next')) && !(await shown('#prev')));
+      } else {
+        check('slide 1.1 shows Next and Prev', (await shown('#next')) && (await shown('#prev')));
+        check('Next goes to slide 1.2', await press('#next', 2), await num());
+        check('Prev goes back to slide 1.1', await press('#prev', 1), await num());
+        await press('#next', 2);
+        check('Next goes on to slide 1.3', await press('#next', 3), await num());
+        check('slide 1.3 (Next hidden) shows Next, and it goes to slide 1.4', (await shown('#next')) && (await press('#next', 4)), await num());
+      }
+      check('no errors from the extension’s scripts', !c.errors.some(e => /storylineReview|core\.js|hook\.js/i.test(e)), c.errors.slice(0, 2).join(' | ') || 'none');
+    } finally { c.close(); }
+  }
   finish();
 })().catch(e => { console.error(e); process.exit(1); });

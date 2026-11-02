@@ -73,7 +73,9 @@ const EXT = path.join(__dirname, '..');
     check('turning the settings off reloads the published course', !!back, await note('slFreeNote'));
     check('the toolbar badge is off again', (await badge()) === '');
 
-    // "Unlock all navigation": the options the course can use, in one save; a dash when only some are on
+    // "Unlock all navigation": the options the course can use, in one save; a dash when only some are on.
+    // Wait until the course has been checked (until then every option counts as available).
+    await waitP(`!/Checking/.test(document.getElementById('slNavNote').textContent + document.getElementById('slUnhideNote').textContent)`);
     const all = () => P(`(() => { const a = document.getElementById('slAllNav'); return { checked: a.checked, mixed: a.indeterminate, disabled: a.disabled }; })()`);
     const saved = () => P(`chrome.storage.local.get('settings').then(r => r.settings)`);
     check('“Unlock all navigation” starts unticked', JSON.stringify(await all()) === '{"checked":false,"mixed":false,"disabled":false}', JSON.stringify(await all()));
@@ -81,23 +83,23 @@ const EXT = path.join(__dirname, '..');
     await P(`document.getElementById('slAllNav').click(); 1`);
     await sleep(1000);
     let s = await saved();
-    check('ticking it turns on free navigation and Next/Prev, and leaves the unavailable seekbar alone', s && s.freeNav && s.nav && !s.seekbar && !s.answers, JSON.stringify(s));
+    check('ticking it turns on free navigation, Unlock Next/Prev, Add Next/Prev where turned off, and leaves the unavailable seekbar alone', s && s.freeNav && s.nav && s.unhide && !s.seekbar && !s.answers, JSON.stringify(s));
     check('… and it shows ticked', JSON.stringify(await all()) === '{"checked":true,"mixed":false,"disabled":false}', JSON.stringify(await all()));
-    const reloaded = await waitP(`/opened as "free"/.test(document.getElementById('slFreeNote').textContent) && /kept enabled/.test(document.getElementById('slNavNote').textContent)`);
-    check('the course reloads with both on', !!reloaded, await note('slNavNote'));
+    const reloaded = await waitP(`/opened as "free"/.test(document.getElementById('slFreeNote').textContent) && /kept enabled/.test(document.getElementById('slNavNote').textContent) && /→ added/.test(document.getElementById('slUnhideNote').textContent)`);
+    check('the course reloads with all three on', !!reloaded, (await note('slNavNote')) + ' | ' + (await note('slUnhideNote')));
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 400, height: 900, deviceScaleFactor: 1, mobile: false }, panel);
-    saveScreenshot('side-panel-all-nav.png', (await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 400, height: 420, scale: 1 } }, panel)).result.data);
+    saveScreenshot('side-panel-all-nav.png', (await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 400, height: 480, scale: 1 } }, panel)).result.data);
     await P(`document.getElementById('slNav').click(); 1`);
     await sleep(500);
     check('turning one off shows a dash (some on)', JSON.stringify(await all()) === '{"checked":false,"mixed":true,"disabled":false}', JSON.stringify(await all()));
     await P(`document.getElementById('slAllNav').click(); 1`);
     await sleep(500);
     s = await saved();
-    check('clicking the dash turns them all on again', s && s.freeNav && s.nav && (await all()).checked, JSON.stringify(s));
+    check('clicking the dash turns them all on again', s && s.freeNav && s.nav && s.unhide && (await all()).checked, JSON.stringify(s));
     await P(`document.getElementById('slAllNav').click(); 1`);
     await sleep(500);
     s = await saved();
-    check('unticking it turns them all off', s && !s.freeNav && !s.nav && !s.seekbar, JSON.stringify(s));
+    check('unticking it turns them all off', s && !s.freeNav && !s.nav && !s.unhide && !s.seekbar, JSON.stringify(s));
     check('the course goes back to the published one', !!(await waitP(`/"restricted"\\.$/.test(document.getElementById('slFreeNote').textContent.trim())`)), await note('slFreeNote'));
   } catch (e) {
     check('test ran without errors', false, e && e.message);

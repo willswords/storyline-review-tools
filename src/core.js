@@ -37,11 +37,23 @@
   //   "controls": { "readonly": true, "readonlyOnce": true }   (seekbar read-only, or until the slide is viewed once)
   // Current Storyline 360 output has both inside "controlOptions"; older output has them at the top level.
   const frameOptions = frame => (frame && frame.controlOptions && typeof frame.controlOptions === 'object' ? frame.controlOptions : frame) || {};
+  // Which player buttons each slide shows: a slide's "Player features" (Prev, Next) pick one of the frame's
+  // "controlLayouts", and the slide applies it as it loads ({"kind":"set_frame_layout","name":"<layout>"}).
+  //   "controlLayouts": { "npnxnanbnsnfns…": { "previous": false, "next": false, "swipeleft": false, "swiperight": false, … } }
+  const LAYOUT_NAV = { previous: 'swipeleft', next: 'swiperight' };   // each button, and the swipe that does the same
+  const controlLayouts = frame => {
+    const l = (frame && frame.controlLayouts) || frameOptions(frame).controlLayouts;
+    return l && typeof l === 'object' ? l : {};
+  };
   function frameInfo(frame) {
     const o = frameOptions(frame), menu = o.menuOptions, c = o.controls;
     return {
       flow: menu && typeof menu.flow === 'string' ? menu.flow : null,
-      seekbar: c && typeof c.readonly === 'boolean' ? { readonly: c.readonly, readonlyOnce: c.readonlyOnce === true } : null
+      seekbar: c && typeof c.readonly === 'boolean' ? { readonly: c.readonly, readonlyOnce: c.readonlyOnce === true } : null,
+      // Layouts that hide Prev or Next, and each one
+      hidesNav: Object.keys(controlLayouts(frame)).filter(k => { const l = controlLayouts(frame)[k]; return l && (l.previous === false || l.next === false); }),
+      hidesPrev: Object.keys(controlLayouts(frame)).filter(k => { const l = controlLayouts(frame)[k]; return l && l.previous === false; }),
+      hidesNext: Object.keys(controlLayouts(frame)).filter(k => { const l = controlLayouts(frame)[k]; return l && l.next === false; })
     };
   }
   function changeFrame(frame, settings) {
@@ -51,7 +63,47 @@
     if (settings.seekbar && o.controls) {
       for (const k of ['readonly', 'readonlyOnce']) if (o.controls[k] === true) { o.controls[k] = false; n++; }
     }
+    // Add Next/Prev buttons where turned off: show them on slides whose Player features hide them
+    if (settings.unhide) for (const l of Object.values(controlLayouts(frame))) {
+      if (!l || typeof l !== 'object') continue;
+      for (const [btn, swipe] of Object.entries(LAYOUT_NAV)) if (l[btn] === false) { l[btn] = true; if (l[swipe] === false) l[swipe] = true; n++; }
+    }
     return n;
+  }
+  // A slide whose Player features hide Next (or Prev) is published without the trigger the button runs, so a Next
+  // button shown on it would do nothing. Storyline's own triggers for them, as on slides that keep the buttons:
+  //   {"kind":"onnextslide","actions":[{"kind":"gotoplay","window":"_current","wndtype":"normal","objRef":{"type":"string","value":"_player.<scene>.<slide>"}}]}
+  //   {"kind":"onprevslide","actions":[{"kind":"history_prev"}]}
+  // Next goes to the following slide in the menu's order (the next scene's first slide after a scene's last).
+  // Only slides whose layout hides the button get one (hidden: { next, prev }); a slide that shows Next with
+  // nowhere to go was made that way, and is left alone.
+  function nextSlidePath(data, slideId) {
+    const order = [];
+    for (const scene of data.scenes || []) if (!scene.isMessageScene) for (const s of scene.slides || []) order.push(scene.id + '.' + s.id);
+    const i = order.findIndex(p => p.endsWith('.' + slideId));
+    return i >= 0 && i < order.length - 1 ? '_player.' + order[i + 1] : null;
+  }
+  function addMissingNav(slide, nextPath, hidden) {
+    if (!slide || typeof slide !== 'object' || !hidden) return 0;
+    const events = Array.isArray(slide.events) ? slide.events : (slide.events = []);
+    let n = 0;
+    if (hidden.next && nextPath && !events.some(e => e && e.kind === 'onnextslide')) {
+      events.push({ kind: 'onnextslide', actions: [{ kind: 'gotoplay', window: '_current', wndtype: 'normal', objRef: { type: 'string', value: nextPath } }] });
+      n++;
+    }
+    if (hidden.prev && !events.some(e => e && e.kind === 'onprevslide')) { events.push({ kind: 'onprevslide', actions: [{ kind: 'history_prev' }] }); n++; }
+    return n;
+  }
+  // Which buttons a slide's layout hides, from frameInfo's lists
+  function hiddenNav(slide, info) {
+    const names = slideLayouts(slide), has = list => names.some(l => (list || []).includes(l));
+    return { next: has(info && info.hidesNext), prev: has(info && info.hidesPrev) };
+  }
+  // The layouts a slide applies (to count the slides whose layout hides Prev or Next)
+  function slideLayouts(slide) {
+    const names = new Set();
+    walk(slide, o => { if ((o.kind === 'set_frame_layout' || o.kind === 'set_window_control_layout') && typeof o.name === 'string') names.add(o.name); });
+    return [...names];
   }
 
   // ── 2. Next/Prev and seekbar triggers: each slide's file (and slides embedded in data.js) ──
@@ -405,7 +457,7 @@
     numeric: 'Numeric', hotspot: 'Hotspot', dragdrop: 'Drag and drop', likert: 'Likert scale', essay: 'Essay', shortanswer: 'Short answer',
     rankingdragdrop: 'Ranking', howmany: 'How many', pickone: 'Pick one', pickmany: 'Pick many', freeform: 'Freeform' };
 
-  const api = { readProvided, frameInfo, changeFrame, countLocks, changeSlideLocks, slideFiles, questionSlides,
+  const api = { readProvided, frameInfo, changeFrame, slideLayouts, nextSlidePath, addMissingNav, hiddenNav, countLocks, changeSlideLocks, slideFiles, questionSlides,
     buildQuizKey, applyAnswers, questionText, describeCondition, numberFor, QUESTION_TYPES, NAV_CONTROLS,
     completionInfo, slideIndex, slideOf, findActions, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
   if (typeof module === 'object' && module.exports) module.exports = api;

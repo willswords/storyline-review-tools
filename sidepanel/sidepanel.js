@@ -3,12 +3,13 @@
 const core = globalThis.__storylineReviewCore;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const KEYS = { slFree: 'freeNav', slSeek: 'seekbar', slNav: 'nav', slAnswers: 'answers' };
+const KEYS = { slFree: 'freeNav', slSeek: 'seekbar', slNav: 'nav', slUnhide: 'unhide', slAnswers: 'answers' };
 
 // The tab to show: the active one (or ?tab=<id>, used by the tests, which open this page in a tab)
 const params = new URLSearchParams(location.search);
 let tabId = params.has('tab') ? Number(params.get('tab')) : null;
-let settings = { freeNav: false, seekbar: false, nav: false, answers: false };
+const NO_SETTINGS = { freeNav: false, seekbar: false, nav: false, unhide: false, answers: false };
+let settings = Object.assign({}, NO_SETTINGS);
 let state = null;
 
 async function findTab() {
@@ -34,7 +35,7 @@ setInterval(() => { if (!state) askState(); }, 2000);
 // ── Settings ──
 chrome.storage.local.get('settings', r => { settings = Object.assign(settings, r && r.settings); render(state); });
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.settings) { settings = Object.assign({ freeNav: false, seekbar: false, nav: false, answers: false }, changes.settings.newValue); render(state); }
+  if (area === 'local' && changes.settings) { settings = Object.assign({}, NO_SETTINGS, changes.settings.newValue); render(state); }
 });
 for (const [id, key] of Object.entries(KEYS)) {
   $(id).addEventListener('change', e => {
@@ -45,7 +46,7 @@ for (const [id, key] of Object.entries(KEYS)) {
 }
 // "Unlock all navigation": turns on (or off) every navigation option the course has something to unlock, saved in one
 // go so the course reloads once. Ticked when they're all on, a dash when only some are.
-const NAV_IDS = ['slFree', 'slSeek', 'slNav'];
+const NAV_IDS = ['slFree', 'slSeek', 'slNav', 'slUnhide'];
 const availableNav = () => NAV_IDS.filter(id => !$(id).disabled);
 $('slAllNav').addEventListener('change', e => {
   const on = e.target.checked, change = {};
@@ -103,12 +104,20 @@ function render(st) {
       (used('seekbar') && seekLocked ? ' <span class="changed">→ opened as draggable</span>.' : '.');
   $('slSeek').disabled = !!st && !seekLocked && !settings.seekbar && !!(locks && locks.checked);
 
-  // Next/Prev: slide triggers that disable the buttons
+  // Unlock Next/Prev: slide triggers that disable (grey out) the buttons
   $('slNavNote').innerHTML = !st ? '' : !locks || !locks.checked ? 'Checking the slides…'
     : locks.nav ? locks.nav + ' trigger(s) in ' + locks.slidesWithNav + ' slide(s) disable Next/Prev' +
       (used('nav') ? ' <span class="changed">→ kept enabled</span>. Slides whose Next has no destination still won’t move on.' : '.')
     : 'No triggers that disable Next/Prev were found.';
   $('slNav').disabled = !!st && !!locks && locks.checked && !locks.nav && !settings.nav;
+
+  // Add Next/Prev buttons where turned off: slides whose Player features (slide properties) leave the buttons out
+  const hidden = locks ? locks.slidesHidingNav || 0 : 0;
+  $('slUnhideNote').innerHTML = !st ? '' : !locks || !locks.checked ? 'Checking the slides…'
+    : hidden ? hidden + ' slide(s) turn off Next/Prev in their Player features' +
+      (used('unhide') ? ' <span class="changed">→ added</span>; Next goes to the next slide, Prev goes back.' : '.')
+    : 'No slides turn off Next/Prev.';
+  $('slUnhide').disabled = !!st && !!locks && locks.checked && !hidden && !settings.unhide;
 
   // Quiz answers
   const qs = st && st.quiz ? st.quiz.questions : [];

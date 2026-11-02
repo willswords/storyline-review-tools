@@ -4,7 +4,7 @@
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
 
 function showBadge(settings) {
-  const on = !!settings && ['freeNav', 'seekbar', 'nav', 'answers'].some(k => settings[k]);
+  const on = !!settings && ['freeNav', 'seekbar', 'nav', 'unhide', 'answers'].some(k => settings[k]);
   chrome.action.setBadgeText({ text: on ? 'ON' : '' });
   chrome.action.setBadgeBackgroundColor({ color: '#b45309' });
   chrome.action.setTitle({ title: on ? 'Storyline Review Tools (on)' : 'Storyline Review Tools' });

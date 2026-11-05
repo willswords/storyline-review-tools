@@ -32,7 +32,14 @@
 </section>
 
 <section id="slideSec" data-start-collapsed hidden>
-  <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>This slide</button></h2>
+  <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>This slide</button><span class="grow"></span>
+    <button id="btnCopyText" class="small" title="Show all the text on this slide, to copy into a comment" aria-controls="slideTextBox" aria-expanded="false">Copy text</button></h2>
+  <div class="slide-text" id="slideTextBox" hidden>
+    <label for="slideText" id="slideTextLabel">Text on this slide</label>
+    <textarea id="slideText" rows="10" spellcheck="false"></textarea>
+    <div class="slide-text-actions"><button id="btnCopyAll" class="small">Copy all</button><button id="btnCloseText" class="small">Close</button>
+      <span class="hint">Select the part you want, then copy (Ctrl+C) and paste it into your comment.</span></div>
+  </div>
   <div class="slide-name" id="slideName"></div>
   <div id="slideNav"></div>
 </section>

@@ -144,10 +144,39 @@ function render(st) {
   renderQuiz(st && st.quiz);
 }
 
+// Copy text: all the slide's text in a box, to select part of and paste into a Review comment. The box keeps what's
+// in it (and any selection) while the same slide is showing; it's filled again when the slide changes.
+let textFor = null;
+// The slide's text by layer, then its notes (under the Notes tab's name in the course, such as "Transcript")
+const slideTextOf = cur => {
+  const parts = cur.text.map(l => (cur.text.length > 1 || l.layer !== 'Base layer' || cur.notes ? '— ' + l.layer + ' —\n' : '') + l.texts.join('\n\n'));
+  if (cur.notes) parts.push('— ' + cur.notes.label + ' (notes) —\n' + cur.notes.text);
+  return parts.join('\n\n');
+};
+function fillSlideText(cur) {
+  textFor = cur.slideId;
+  $('slideTextLabel').textContent = 'Text on slide ' + cur.number + (cur.title ? ' “' + cur.title + '”' : '');
+  $('slideText').value = cur.text.length || cur.notes ? slideTextOf(cur) : '(No text on this slide.)';
+}
+function showSlideText(open) {
+  $('slideTextBox').hidden = !open;
+  $('btnCopyText').setAttribute('aria-expanded', String(open));
+  if (open && state && state.current) { fillSlideText(state.current); $('slideText').focus(); $('slideText').setSelectionRange(0, 0); }
+}
+$('btnCopyText').addEventListener('click', () => showSlideText($('slideTextBox').hidden));
+$('btnCloseText').addEventListener('click', () => showSlideText(false));
+$('btnCopyAll').addEventListener('click', async e => {
+  const btn = e.currentTarget, box = $('slideText');
+  try { await navigator.clipboard.writeText(box.value); } catch (err) { box.select(); document.execCommand('copy'); }
+  btn.textContent = 'Copied';
+  setTimeout(() => { btn.textContent = 'Copy all'; }, 1500);
+});
+
 // This slide: why Next and Prev are (or aren't) there, and what would get past them
 function renderSlide(cur) {
   $('slideSec').hidden = !cur;
-  if (!cur) return;
+  if (!cur) { showSlideText(false); return; }
+  if (!$('slideTextBox').hidden && textFor !== cur.slideId) fillSlideText(cur);
   $('slideName').innerHTML = 'Slide <b>' + esc(cur.number) + '</b>' + (cur.title ? ' “' + esc(cur.title) + '”' : '');
   const on = key => state && state.settings[key];
   const part = (btn, label) => {

@@ -82,6 +82,8 @@ Next  [Not showing]
   No option overrides a trigger that hides it; Free navigation (menu) lets you jump on from the menu.
 ```
 
+**Copy text**, in the section's heading, opens a box with all the text on the slide, layer by layer (base layer first, then "Layer 2", "Layer 3"…, as published layers have no names), top to bottom and left to right. Select the part you want to change, copy it (Ctrl+C) and paste it into your Review comment, or use **Copy all**. It includes text that's hidden at first, such as feedback and pop-ups, and ends with the slide's notes from the player's Notes tab, under the tab's name in the course (often "Transcript"). The box keeps your selection while you stay on the slide, and shows the next slide's text when you move on.
+
 When the button isn't available, it says which option gets past it: **Unlock Next/Prev buttons** for a disabled button, **Add Next/Prev buttons where turned off** for one turned off in Player features. Storyline's own trigger that disables Prev on the first slide you open isn't counted as a lock.
 
 ### Completion

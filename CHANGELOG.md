@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.0 (2026-11-04)
+
+- **Copy text**, in This slide's heading: a box with all the text on the slide you're on, layer by layer, in reading order, to select part of and paste into a Review comment (or **Copy all**). Line breaks inside a paragraph are kept. The slide's notes (the player's Notes tab, from `notesData` in `frame.js`) come last, under the tab's name in the course, such as "Transcript".
+
 ## 1.2.0 (2026-11-04)
 
 - **This slide**, a new side panel section that explains why you can or can't move on. For the slide you're on, it shows whether Next and Prev are available, greyed out or not showing right now, and why: turned off in the slide's Player features, or triggers that disable, enable, hide or show them, each with when it runs and what it waits for (for example "Disabled as the slide appears, if the timeline hasn't played to the end yet"; "Shown and enabled when “Tab A” is visited…"). It also shows where Next and Prev go, the slide's own buttons that go to other slides, the current values of variables the triggers check, and which option gets past a lock. It starts collapsed, so a new user isn't shown everything at once; once opened, it stays open.

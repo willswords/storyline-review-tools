@@ -73,11 +73,22 @@ const EXT = path.join(__dirname, '..');
     check('This slide starts collapsed', await closed());
     await P(`document.querySelector('#slideSec .sec-toggle').click(); 1`);
     check('… and opens when its heading is clicked', !(await closed()));
+    // Copy text: the slide's text in a box
+    await P(`document.getElementById('btnCopyText').click(); 1`);
+    const box = await P(`({ open: !document.getElementById('slideTextBox').hidden, label: document.getElementById('slideTextLabel').textContent, text: document.getElementById('slideText').value })`);
+    check('Copy text opens a box with the slide’s text', box.open && /^Text on slide 1\.1/.test(box.label) && box.text.length > 20 && !/No text on this slide/.test(box.text), box.label + ' | ' + box.text.slice(0, 120).replace(/\n/g, ' ⏎ '));
+    const notesAt = box.text.indexOf('— Transcript (notes) —');
+    check('… ending with the slide’s notes, under the tab’s name in the course (“Transcript”)', notesAt > 0 && /Welcome to the Team Member Saf/.test(box.text.slice(notesAt)), box.text.slice(Math.max(0, notesAt), notesAt + 120).replace(/\n/g, ' ⏎ '));
+    await P(`document.getElementById('btnCopyAll').click(); 1`);
+    await sleep(300);
+    check('… and Copy all copies it', (await P(`document.getElementById('btnCopyAll').textContent`)) === 'Copied');
     if (slideSec) {
       await cdp.send('Emulation.setDeviceMetricsOverride', { width: 400, height: 900, deviceScaleFactor: 1, mobile: false }, panel);
-      const box = await P(`(() => { const r = document.getElementById('slideSec').getBoundingClientRect(); return { y: r.top + scrollY, h: r.height }; })()`);
-      saveScreenshot('side-panel-this-slide.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: box.y, width: 400, height: Math.min(box.h, 700), scale: 1 } }, panel)).result.data);
+      const area = await P(`(() => { const r = document.getElementById('slideSec').getBoundingClientRect(); return { y: r.top + scrollY, h: r.height }; })()`);
+      saveScreenshot('side-panel-this-slide.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: area.y, width: 400, height: Math.min(area.h, 700), scale: 1 } }, panel)).result.data);
     }
+    await P(`document.getElementById('btnCloseText').click(); 1`);
+    check('Close hides the text box', await P(`document.getElementById('slideTextBox').hidden`));
 
     // A screenshot of the panel at side-panel width, and of the seat time with how it's worked out
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 400, height: 900, deviceScaleFactor: 1, mobile: false }, panel);

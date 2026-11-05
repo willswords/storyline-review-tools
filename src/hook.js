@@ -32,6 +32,7 @@
   };
   const startedAt = Date.now();
   let data = null;                      // data.js, as published
+  let notes = null;                     // each slide's notes, from frame.js (core.slideNotes)
   const slideCache = new Map();         // html5url → slide JSON as published
   const fileOfSlide = new Map();        // slide id → html5url
   const lockCounts = new Map();         // html5url (or '#data' for slides inside data.js) → { nav, seek, layouts }
@@ -173,7 +174,8 @@
           let slide = file ? slideCache.get(file) : null;
           if (!slide && !file) for (const sc of data.scenes || []) for (const x of sc.slides || []) if (x.id === id && x.slideLayers) slide = x;
           if (!slide) return;   // not read yet: tried again on the next tick
-          explained = core.explainSlide(slide, data, state.frame);
+          const note = notes && notes.bySlide[id];
+          explained = Object.assign(core.explainSlide(slide, data, state.frame), { text: core.slideText(slide), notes: note ? { label: notes.label, text: note } : null });
           explainedFor = id;
         }
         const player = window.GetPlayer && window.GetPlayer();
@@ -307,6 +309,7 @@
     if (kind === 'frame') {
       const frame = JSON.parse(json);
       state.frame = core.frameInfo(frame);
+      notes = core.slideNotes(frame);
       const n = core.changeFrame(frame, settings);
       state.changed.frame = n;
       sendState();

@@ -50,6 +50,15 @@ button.small:hover{border-color:var(--accent);color:var(--accent)}
 
 .sl-head{margin-top:12px;font-size:12px;font-weight:600}
 .slide-name{font-size:12px;color:var(--muted);margin-bottom:6px}
+.slide-text{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
+.slide-text[hidden]{display:none}
+.slide-text label{font-size:12px;font-weight:600}
+.slide-text textarea{width:100%;min-height:140px;resize:vertical;font:12px/1.45 var(--sans);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:6px}
+.slide-text textarea:focus{outline:2px solid var(--accent);outline-offset:0}
+.slide-text-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.slide-text-actions .hint{font-size:11px;color:var(--muted)}
+/* The section's collapsed rule hides everything but the heading; the text box opens it again */
+section.collapsed > .slide-text:not([hidden]){display:flex !important}
 .slide-name b{color:var(--text);font-weight:600}
 #slideNav{font-size:12px;display:flex;flex-direction:column;gap:8px}
 #slideNav .btn-head{display:flex;align-items:center;gap:8px;font-weight:600}

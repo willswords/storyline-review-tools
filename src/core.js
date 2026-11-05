@@ -16,7 +16,7 @@
     return s.replace(/\\(u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|\r\n|[\s\S])/g, (m, e) => {
       if (e.length > 1 && e[0] === 'u') return String.fromCodePoint(parseInt(e[1] === '{' ? e.slice(2, -1) : e.slice(1), 16));
       if (e.length === 3 && e[0] === 'x') return String.fromCharCode(parseInt(e.slice(1), 16));
-      const map = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v', 0: '\0', '\n': '', '\r': '', '\r\n': '', ' ': '', ' ': '' };
+      const map = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', v: '\v', 0: '\0', '\n': '', '\r': '', '\r\n': '', '\u2028': '', '\u2029': '' };
       return e in map ? map[e] : e;
     });
   }
@@ -562,6 +562,57 @@
     return { slideId: slide.id, number: here ? here.number : '', title: here ? here.title : plain(slide.title), buttons, jumps: jumpList.slice(0, 8), vars: [...vars] };
   }
 
+  // ── The text on a slide, for a reviewer to copy into a comment ──
+  // Each layer's text boxes in reading order: top to bottom, then left to right, by their position on the slide
+  // (an object inside a group is placed relative to the group). Each text box is one entry, its paragraphs on
+  // separate lines. Object states (Hover, Visited and so on) usually repeat the object's text, so they're left out.
+  // Layers have no names in the published course, so they're "Layer 2", "Layer 3" and so on, in the slide's order.
+  function slideText(slide) {
+    const out = [];
+    (Array.isArray(slide && slide.slideLayers) ? slide.slideLayers : []).forEach((layer, i) => {
+      const items = [];
+      (function find(objects, dx, dy) {
+        for (const o of Array.isArray(objects) ? objects : []) {
+          if (!o || typeof o !== 'object') continue;
+          const x = dx + (+o.xPos || 0), y = dy + (+o.yPos || 0);
+          for (const t of Array.isArray(o.textLib) ? o.textLib : []) {
+            // (a line break inside a paragraph is stored as "\r")
+            const text = ((t && t.vartext && t.vartext.blocks) || []).map(b => (b.spans || []).map(sp => sp.text).join('')
+              .replace(/\r\n?|[\u2028\u2029]/g, '\n').replace(/[ \t]+$/gm, '').trim()).filter(Boolean).join('\n');
+            if (text) items.push({ x, y, text });
+          }
+          find(o.objects, x, y);
+        }
+      })(layer && layer.objects, 0, 0);
+      // Text boxes within 8 pixels of the same height read as one row, left to right
+      items.sort((a, b) => Math.abs(a.y - b.y) > 8 ? a.y - b.y : a.x - b.x);
+      const texts = items.map(t => t.text).filter((t, k, all) => all.indexOf(t) === k);
+      if (texts.length) out.push({ layer: i === 0 ? 'Base layer' : 'Layer ' + (i + 1), texts });
+    });
+    return out;
+  }
+
+  // Each slide's notes (the player's Notes tab, which a course may rename, for example "Transcript"): in frame.js,
+  //   "notesData": [{ "slideId": "<scene>.<slide>", "content": "<p …><span …>…</span></p>…" }]
+  // and the tab's name in "stringTables" ("transcript"). Returns { label, bySlide: { slideId: text } }.
+  function htmlToText(html) {
+    const entity = (m, e) => e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10))
+      : ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ' })[e] || m;
+    return String(html || '').replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|h\d)>/gi, '\n').replace(/<[^>]*>/g, '')
+      .replace(/&(#x?[0-9a-f]+|\w+);/gi, entity).replace(/ /g, ' ')
+      .split('\n').map(l => l.replace(/[ \t]+/g, ' ').trim()).filter(Boolean).join('\n');
+  }
+  function slideNotes(frame) {
+    const bySlide = {};
+    for (const n of Array.isArray(frame && frame.notesData) ? frame.notesData : []) {
+      const text = n && htmlToText(n.content);
+      if (text) bySlide[String(n.slideId || '').split('.').pop()] = text;
+    }
+    let label = '';
+    for (const t of Object.values((frame && frame.stringTables) || {})) if (!label && t && t.string && typeof t.string.transcript === 'string') label = t.string.transcript.trim();
+    return { label: label || 'Notes', bySlide };
+  }
+
   // ── 6. Estimated seat time: how long the course takes to go through once ──
   // Storyline doesn't record one, so it's worked out from the slides:
   //   - each slide's base layer timeline ("timeline":{"duration": ms}), which runs as long as its narration and video;
@@ -691,7 +742,7 @@
 
   const api = { readProvided, frameInfo, changeFrame, slideLayouts, nextSlidePath, addMissingNav, hiddenNav, countLocks, changeSlideLocks, slideFiles, questionSlides,
     buildQuizKey, applyAnswers, questionText, describeCondition, numberFor, QUESTION_TYPES, NAV_CONTROLS,
-    completionInfo, seatTime, slideIndex, slideOf, findActions, explainSlide, describeStatement, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
+    completionInfo, seatTime, slideText, slideNotes, htmlToText, slideIndex, slideOf, findActions, explainSlide, describeStatement, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else Object.defineProperty(root, '__storylineReviewCore', { value: api });   // hidden from the course's own scripts' enumeration
 })(typeof globalThis !== 'undefined' ? globalThis : this);

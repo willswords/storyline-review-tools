@@ -3,12 +3,12 @@
 const core = globalThis.__storylineReviewCore;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const KEYS = { slFree: 'freeNav', slSeek: 'seekbar', slNav: 'nav', slUnhide: 'unhide', slAnswers: 'answers' };
+const KEYS = { slFree: 'freeNav', slSeek: 'seekbar', slNav: 'nav', slUnhide: 'unhide', slNumbers: 'menuNumbers', slAnswers: 'answers' };
 
 // The tab to show: the active one (or ?tab=<id>, used by the tests, which open this page in a tab)
 const params = new URLSearchParams(location.search);
 let tabId = params.has('tab') ? Number(params.get('tab')) : null;
-const NO_SETTINGS = { freeNav: false, seekbar: false, nav: false, unhide: false, answers: false };
+const NO_SETTINGS = { freeNav: false, seekbar: false, nav: false, unhide: false, menuNumbers: false, answers: false };
 let settings = Object.assign({}, NO_SETTINGS);
 let lastCheck = null;   // which options were unavailable when the course in the tab was last fully checked
 let state = null;
@@ -106,6 +106,13 @@ function render(st) {
       (seekLocks ? '; ' + seekLocks + ' trigger(s) disable it' : '') +
       (used('seekbar') && seekLocked ? ' <span class="changed">→ opened as draggable</span>.' : '.');
   $('slSeek').disabled = !!st && !seekLocked && !settings.seekbar && !!(locks && locks.checked);
+
+  // Menu numbers: frame.js menuOptions.autonumber (the player's "Number entries automatically")
+  const numbered = st && st.frame && st.frame.menuNumbers;
+  $('slNumbersNote').innerHTML = !st ? '' : numbered == null ? 'No menu numbering setting found in frame.js.'
+    : numbered ? 'Menu entries are already numbered.'
+    : 'Menu entries aren’t numbered' + (used('menuNumbers') ? ' <span class="changed">→ numbered (1.1, 1.2…)</span>.' : '.');
+  $('slNumbers').disabled = !!st && numbered !== false && !settings.menuNumbers;
 
   // Unlock Next/Prev: slide triggers that disable (grey out) the buttons
   $('slNavNote').innerHTML = !st ? '' : !locks || !locks.checked ? 'Checking the slides…'
@@ -223,8 +230,27 @@ const publishedOn = iso => {
 };
 $('versPick').addEventListener('change', e => { chrome.tabs.sendMessage(tabId, { type: 'compare', folder: e.target.value }).catch(() => {}); });
 const quoted = s => '“' + esc(s.length > 400 ? s.slice(0, 399) + '…' : s) + '”';
-// Old text, then the new text on its own line after the arrow, so the two line up for reading
-const wasNow = (was, now) => '<span class="was">' + quoted(was) + '</span> →<br><span class="now">' + quoted(now) + '</span>';
+// Old text, then the new text on its own line after the arrow, so the two line up for reading. Word by word
+// (core.wordChanges): in the old text the removed words are bold; in the new text the added words are bold and
+// highlighted, and "[…]" marks where words were removed without a replacement (pointing at it shows them).
+const marked = (text, cls) => { const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(text); return m[1] + (m[2] ? '<b class="' + cls + '">' + esc(m[2]) + '</b>' : '') + m[3]; };
+function wasNow(was, now) {
+  const parts = core.wordChanges(was, now);
+  if (was.length + now.length > 1600 || parts.filter(p => p.op === 'same').reduce((n, p) => n + p.text.trim().length, 0) < 3)   // nothing in common, or very long
+    return '<span class="was">' + quoted(was) + '</span> →<br><span class="now">' + quoted(now) + '</span>';
+  let old = '', neu = '';
+  parts.forEach((p, k) => {
+    if (p.op === 'same') { old += esc(p.text); neu += esc(p.text); }
+    else if (p.op === 'add') neu += marked(p.text, 'ins');
+    else {
+      old += marked(p.text, 'del');
+      // Removed with nothing added in its place: a marker in the new text
+      if (!(parts[k + 1] && parts[k + 1].op === 'add') && !(parts[k - 1] && parts[k - 1].op === 'add'))
+        neu += '<span class="cut" title="Removed: ' + esc(p.text.trim()) + '" aria-label="removed: ' + esc(p.text.trim()) + '">[…]</span>' + (/\s$/.test(p.text) && !/\s$/.test(neu) ? ' ' : '');
+    }
+  });
+  return '<span class="was">“' + old + '”</span> →<br><span class="now">“' + neu + '”</span>';
+}
 function renderVersions(v) {
   $('versSec').hidden = !v;
   if (!v) return;
@@ -249,17 +275,24 @@ function renderVersions(v) {
     (d.captionsCompared === false ? ' Closed captions weren’t compared: one of the versions was saved before captions were, or they couldn’t be read. Open it again to update it.' : '');
   // A slide in the version showing is a link that goes to it; one only in the other version is plain text
   const name = s => 'Slide ' + esc(s.number) + (s.title ? ' “' + esc(s.title) + '”' : '');
-  const slide = (s, here = true) => here && s.id ? '<a href="#" class="go" data-slide="' + esc(s.id) + '" title="Go to this slide">' + name(s) + '</a>' : name(s);
-  $('versList').innerHTML =
-    d.changed.map(c => '<li>' + slide(c) +
+  // The slide showing in the course is highlighted, with a tag (only a slide in this version can be showing)
+  const showing = state && state.current && state.current.slideId;
+  const isShowing = (s, here = true) => here && !!s.id && s.id === showing;
+  const slide = (s, here = true) => (here && s.id ? '<a href="#" class="go" data-slide="' + esc(s.id) + '" title="Go to this slide">' + name(s) + '</a>' : name(s)) +
+    (isShowing(s, here) ? ' <span class="here-tag">You’re on this slide</span>' : '');
+  const li = (s, here = true) => '<li' + (isShowing(s, here) ? ' class="here" aria-current="true"' : '') + '>';
+  const html =
+    d.changed.map(c => li(c) + slide(c) +
       [c.moved ? 'moved from slide ' + esc(c.moved) : '', c.renamed ? 'renamed from “' + esc(c.renamed) + '”' : ''].filter(Boolean).map(t => '<div class="what">' + t + '</div>').join('') +
-      [[c.text, ''], [c.captions || [], 'Captions: ']].map(([lines, label]) => lines.map(t => '<div class="pair">' + label +
+      // (captions and notes are labelled, with the change starting on the next line)
+      [[c.text, ''], [c.captions || [], 'Captions:'], [Array.isArray(c.notes) ? c.notes : [], 'Notes:']].map(([lines, label]) => lines.map(t => '<div class="pair">' + (label ? label + '<br>' : '') +
         (t.was != null && t.now != null ? wasNow(t.was, t.now)
-          : t.now != null ? '<span class="add">' + (label ? 'added' : 'Added') + '</span> ' + quoted(t.now) : '<span class="del">' + (label ? 'removed' : 'Removed') + '</span> ' + quoted(t.was)) + '</div>').join('')).join('') +
-      (c.notes ? '<div class="pair">Notes ' + (c.notes.was && c.notes.now ? 'changed: ' + wasNow(c.notes.was, c.notes.now)
-        : c.notes.now ? '<span class="add">added</span>: ' + quoted(c.notes.now) : '<span class="del">removed</span>') + '</div>' : '') + '</li>').join('') +
-    d.added.map(s => '<li><span class="add">Added</span> ' + slide(s, v.thisIsNewer) + '</li>').join('') +
-    d.removed.map(s => '<li><span class="del">Removed</span> ' + slide(s, !v.thisIsNewer) + ' <span class="what">(its number in the older version)</span></li>').join('');
+          : t.now != null ? '<span class="add">Added</span> ' + quoted(t.now) : '<span class="del">Removed</span> ' + quoted(t.was)) + '</div>').join('')).join('') +
+      '</li>').join('') +
+    d.added.map(s => li(s, v.thisIsNewer) + '<span class="add">Added</span> ' + slide(s, v.thisIsNewer) + '</li>').join('') +
+    d.removed.map(s => li(s, !v.thisIsNewer) + '<span class="del">Removed</span> ' + slide(s, !v.thisIsNewer) + ' <span class="what">(its number in the older version)</span></li>').join('');
+  // (only when it changed, so the list isn't rebuilt under the reviewer's pointer as the course plays)
+  if ($('versList').dataset.html !== html) { $('versList').innerHTML = html; $('versList').dataset.html = html; }
 }
 // A slide link: go to that slide in the course
 $('versList').addEventListener('click', e => {

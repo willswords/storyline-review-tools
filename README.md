@@ -8,6 +8,7 @@ A Chrome and Edge extension for reviewing Articulate Storyline courses on **Arti
 | **Unlock seekbar** | Makes the seekbar draggable, if the course makes it read-only. |
 | **Unlock Next/Prev buttons** | Keeps Next and Prev enabled on slides whose triggers disable them (for example "disable Next until the timeline ends"). The buttons are there but greyed out. |
 | **Add Next/Prev buttons where turned off** | Shows Next and Prev on slides whose Player features (slide properties) leave them out, including question slides, where Next appears beside Submit. Next goes to the next slide in the menu, Prev goes back. |
+| **Number the menu entries** | Shows the course menu with each entry numbered (1.1, 1.2…), as the player's "Number entries automatically" menu setting does, so it's easy to refer to a slide by its number in comments. |
 | **Pre-select correct quiz answers** | Opens question slides with the correct answer already filled in, so you only press Submit. |
 
 The side panel also explains **why you can or can't move on from the slide you're on** (see [This slide](#this-slide)), shows **what changed since an earlier version** (see [Changes since an earlier version](#changes-since-an-earlier-version)), lists the course's **quiz answers**, as the course scores them, and shows **when the course completes**: what its tracking needs, and the status it reports as you play it (see [Completion](#completion)).
@@ -61,6 +62,10 @@ The options apply to **every Review course you open** until you turn them off. W
 
 Other question types (drag and drop, matching, sequence, word bank and so on) are answered by hand. The **Quiz answers** list in the panel shows their correct answers.
 
+### Slide numbers
+
+Everywhere the panel shows a slide number (This slide, Changes since an earlier version, Completion), it's the slide's number in the course menu, as **Number the menu entries** shows it. The menu can group slides differently from the scenes: a slide that's slide 18 of scene 1 may be the 3rd entry under the 6th heading in the menu, so it's 6.3. A slide that isn't in the menu, such as a results slide, has its scene number, marked "(not in menu)".
+
 ### This slide
 
 When you're stuck on a slide, **This slide** in the panel says why. It starts collapsed: click its heading to open it (the panel remembers whether it's open). It follows the slide you're on and shows, for Next and for Prev:
@@ -82,7 +87,7 @@ Next  [Not showing]
   No option overrides a trigger that hides it; Free navigation (menu) lets you jump on from the menu.
 ```
 
-**Copy text**, in the section's heading, opens a box with all the text on the slide, layer by layer (base layer first, then "Layer 2", "Layer 3"…, as published layers have no names), top to bottom and left to right. Select the part you want to change, copy it (Ctrl+C) and paste it into your Review comment, or use **Copy all**. It includes text that's hidden at first, such as feedback and pop-ups, then the closed captions of the slide's audio and video (one caption per line, as in Storyline's captions editor, labelled with their layer), and ends with the slide's notes from the player's Notes tab, under the tab's name in the course (often "Transcript"). The box keeps your selection while you stay on the slide, and shows the next slide's text when you move on.
+**Copy text**, in the section's heading, opens a box with all the text on the slide, layer by layer (base layer first, then "Layer 2", "Layer 3"…, as published layers have no names), top to bottom and left to right. Sentences aren't broken across lines: each paragraph is on one line (a line break inside a paragraph becomes a space, and a paragraph that carries on a sentence, such as a title wrapped onto two lines, joins the one before). Select the part you want to change, copy it (Ctrl+C) and paste it into your Review comment, or use **Copy all**. It includes text that's hidden at first, such as feedback and pop-ups, then the closed captions of the slide's audio and video (one sentence per line, labelled with their layer), and ends with the slide's notes from the player's Notes tab, under the tab's name in the course (often "Transcript"). The box keeps your selection while you stay on the slide, and shows the next slide's text when you move on.
 
 When the button isn't available, it says which option gets past it: **Unlock Next/Prev buttons** for a disabled button, **Add Next/Prev buttons where turned off** for one turned off in Player features. Storyline's own trigger that disables Prev on the first slide you open isn't counted as a lock.
 
@@ -101,9 +106,11 @@ From that version to this one: 1 changed, 1 added, 2 removed slides.
   • Removed Slide 1.3 "Quiz Results"
 ```
 
-Each slide in the list is a link: click it to go straight to that slide, even if the course's menu is restricted (as Review does when you click a comment). A slide that's only in the other version, such as one removed since, isn't a link.
+Each slide in the list is a link: click it to go straight to that slide, even if the course's menu is restricted (as Review does when you click a comment). A slide that's only in the other version, such as one removed since, isn't a link. The slide you're on in the course is highlighted in the list, tagged "You're on this slide", and the highlight follows you as you move through the course.
 
-It compares slide titles, text (on every layer), the closed captions of the slide's audio and video (caption by caption, listed as "Captions:"), notes and slide order. Versions remembered by an earlier version of the extension have no captions, so captions aren't compared with them until they're opened again. Slides are matched between versions by Storyline's own slide IDs, so a slide that moved or was renamed is still the same slide. Images, media, triggers and layout aren't compared.
+It compares slide titles, text (on every layer), the closed captions of the slide's audio and video (listed as "Captions:"), notes (listed as "Notes:") and slide order. Captions and notes are compared sentence by sentence, and line breaks and spacing don't count as changes, so rewording one sentence shows only that sentence, not every caption after it.
+
+In a changed line, the words that changed stand out: in the new text, added words are **bold and highlighted**, and a red **[…]** marks where words were removed (point at it to see them); in the old, struck-through text, the removed words are bold. For example: "Many areas in our buildings have both ivory **or white** and red electrical outlets." Versions remembered by an earlier version of the extension have no captions, so captions aren't compared with them until they're opened again. Slides are matched between versions by Storyline's own slide IDs, so a slide that moved or was renamed is still the same slide. Images, media, triggers and layout aren't compared.
 
 Review doesn't let the extension see its list of versions, so the extension remembers each version **when you open it**: it keeps a copy of the version's text in your browser (the most recent 30 versions), and nothing is sent anywhere. So:
 
@@ -168,7 +175,7 @@ A Storyline course loads its content as data files (`html5/data/js/frame.js`, `d
 
 The extension runs a small script in that frame before the Storyline player starts. It wraps `globalProvideData`, and changes each file's content as it arrives:
 
-- `frame.js`: the menu's `flow` setting becomes `"free"`; the seekbar's `readonly` settings become `false`. For Add Next/Prev buttons where turned off, in the control layouts slides pick with their Player features (`controlLayouts`), `"previous"` and `"next"` (and their swipes) become `true`.
+- `frame.js`: the menu's `flow` setting becomes `"free"`; for Number the menu entries, its `autonumber` becomes `true`; the seekbar's `readonly` settings become `false`. For Add Next/Prev buttons where turned off, in the control layouts slides pick with their Player features (`controlLayouts`), `"previous"` and `"next"` (and their swipes) become `true`.
 - Slide files: triggers that disable Next, Prev or the seekbar (`enable_window_control` with `"enable": false`) become `"enable": true`. For Add Next/Prev buttons where turned off, a slide that hides a button is published without the trigger it runs, so it gets Storyline's usual one: Next goes to the next slide in the menu's order, Prev goes back.
 - Question slides: the correct choices start selected, a hotspot's click starts recorded. Fill-in and numeric answers are set through the player's own `SetVar`.
 

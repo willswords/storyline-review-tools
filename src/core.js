@@ -49,6 +49,8 @@
     const o = frameOptions(frame), menu = o.menuOptions, c = o.controls;
     return {
       flow: menu && typeof menu.flow === 'string' ? menu.flow : null,
+      // The menu's "Number entries automatically" ("autonumber"): 1.1, 1.2… before each slide's title
+      menuNumbers: menu && typeof menu.autonumber === 'boolean' ? menu.autonumber : null,
       seekbar: c && typeof c.readonly === 'boolean' ? { readonly: c.readonly, readonlyOnce: c.readonlyOnce === true } : null,
       // Layouts that hide Prev or Next, and each one
       hidesNav: Object.keys(controlLayouts(frame)).filter(k => { const l = controlLayouts(frame)[k]; return l && (l.previous === false || l.next === false); }),
@@ -60,6 +62,7 @@
     const o = frameOptions(frame);
     let n = 0;
     if (settings.freeNav && o.menuOptions && typeof o.menuOptions.flow === 'string' && o.menuOptions.flow !== 'free') { o.menuOptions.flow = 'free'; n++; }
+    if (settings.menuNumbers && o.menuOptions && o.menuOptions.autonumber === false) { o.menuOptions.autonumber = true; n++; }
     if (settings.seekbar && o.controls) {
       for (const k of ['readonly', 'readonlyOnce']) if (o.controls[k] === true) { o.controls[k] = false; n++; }
     }
@@ -345,12 +348,35 @@
   const SCORE_CALLS = pct => ({ scorm12: 'cmi.core.score.raw = ' + pct, scorm2004: 'cmi.score.raw = ' + pct + ', cmi.score.scaled = ' + Math.round(pct) / 100, xapi: 'result.score.scaled ' + Math.round(pct) / 100 });
 
   const plain = s => String(s == null ? '' : s).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
-  // Slides by id, numbered as the course menu numbers them ("1.3" is scene 1, slide 3)
+  // The number each slide has in the course menu, by its place in the menu's outline (frame.js navData.outline):
+  // the menu can group slides differently from the scenes, so "Question 5 - 2nd Attempt" (scene 1, slide 18) is
+  // the 3rd entry under the 6th heading, 6.3, as the menu numbers it. { slideId: "6.3" }
+  function menuNumbers(frame) {
+    const out = {};
+    (function number(links, prefix) {
+      (Array.isArray(links) ? links : []).forEach((l, i) => {
+        if (!l || typeof l !== 'object') return;
+        const n = prefix + (i + 1);
+        const id = String(l.slideid || '').split('.').pop();
+        if (id && !(id in out)) out[id] = n;
+        number(l.links, n + '.');
+      });
+    })(frame && frame.navData && frame.navData.outline && frame.navData.outline.links, '');
+    return out;
+  }
+  // Slides by id, numbered as the course menu numbers them when data.menuNumbers (from menuNumbers) is set, otherwise
+  // by scene ("1.3" is scene 1, slide 3). A slide that isn't in the menu (such as a results slide) keeps its scene
+  // number, marked so it can't be taken for the menu's slide of the same number: "1.19 (not in menu)".
   function slideIndex(data) {
-    const map = new Map();
+    const map = new Map(), menu = data.menuNumbers;
+    const hasMenu = !!menu && Object.keys(menu).length > 0;
     for (const scene of data.scenes || []) {
       if (scene.isMessageScene) continue;
-      for (const s of scene.slides || []) map.set(s.id, { id: s.id, number: scene.sceneNumber + '.' + s.slideNumberInScene, title: plain(s.title), slide: s });
+      for (const s of scene.slides || []) {
+        const bySceneNo = scene.sceneNumber + '.' + s.slideNumberInScene;
+        const number = !hasMenu ? bySceneNo : menu[s.id] || bySceneNo + ' (not in menu)';
+        map.set(s.id, { id: s.id, number, sceneNumber: bySceneNo, inMenu: !hasMenu || !!menu[s.id], title: plain(s.title), slide: s });
+      }
     }
     return map;
   }
@@ -567,6 +593,7 @@
   // (an object inside a group is placed relative to the group). Each text box is one entry, its paragraphs on
   // separate lines. Object states (Hover, Visited and so on) usually repeat the object's text, so they're left out.
   // Layers have no names in the published course, so they're "Layer 2", "Layer 3" and so on, in the slide's order.
+  const CARRY_ON = /(?:^|\s)(and|or|nor|but|of|the|a|an|to|for|in|on|at|by|with|from|as|that|your|our|their|its|is|are|&|-|–)$/i;
   function slideText(slide) {
     const out = [];
     (Array.isArray(slide && slide.slideLayers) ? slide.slideLayers : []).forEach((layer, i) => {
@@ -576,9 +603,13 @@
           if (!o || typeof o !== 'object') continue;
           const x = dx + (+o.xPos || 0), y = dy + (+o.yPos || 0);
           for (const t of Array.isArray(o.textLib) ? o.textLib : []) {
-            // (a line break inside a paragraph is stored as "\r")
-            const text = ((t && t.vartext && t.vartext.blocks) || []).map(b => (b.spans || []).map(sp => sp.text).join('')
-              .replace(/\r\n?|[\u2028\u2029]/g, '\n').replace(/[ \t]+$/gm, '').trim()).filter(Boolean).join('\n');
+            // Paragraphs on their own lines. A line break inside a paragraph (Shift+Enter, stored as "\r") is a space,
+            // and a paragraph that carries on a sentence joins the one before: it starts with a small letter, or the
+            // one before ends in a word a sentence can't end on ("Team Member Safety and" / "Workplace Violence").
+            const paras = ((t && t.vartext && t.vartext.blocks) || []).map(b => (b.spans || []).map(sp => sp.text).join('')
+              .replace(/\r\n?|[\u2028\u2029]|\n/g, ' ').replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
+            const carriesOn = (before, p) => !/[.!?:;\u2026]["\u201d\u2019)]*$/.test(before) && (/^[a-z&,\u2013\u2014-]/.test(p) || CARRY_ON.test(before));
+            const text = paras.reduce((all, p) => all && carriesOn(all, p) ? all + ' ' + p : (all ? all + '\n' : '') + p, '');
             if (text) items.push({ x, y, text });
           }
           find(o.objects, x, y);
@@ -671,7 +702,8 @@
       }
       slides.push({ id: s.id, number: s.number, title: s.title, text, captions, notes: (notes && notes.bySlide[s.id]) || '' });
     }
-    return { courseId: data.courseId || data.projectId || '', title: slides.length ? slides[0].title : '', hasCaptions, slides };
+    // (numbering: "menu" for menu numbers; versions kept before 1.7.0 have scene numbers)
+    return { courseId: data.courseId || data.projectId || '', title: slides.length ? slides[0].title : '', hasCaptions, numbering: data.menuNumbers ? 'menu' : 'scene', slides };
   }
   // How alike two texts are, by the words they share (0 to 1): to pair a removed text box with the one that replaced it
   const wordsOf = s => String(s).toLowerCase().match(/[a-z0-9']+/g) || [];
@@ -680,6 +712,30 @@
     if (!wa.length || !wb.size) return 0;
     const shared = wa.filter(w => wb.has(w)).length;
     return 2 * shared / (wa.length + wb.size);
+  }
+  // What changed inside a line, word by word: [{ op: 'same' | 'del' | 'add', text }]. Words, punctuation and spaces
+  // are separate pieces, so "cylinders.onnected to …" → "cylinders." marks just "onnected to …" as removed.
+  function wordChanges(was, now) {
+    const split = s => String(s || '').match(/[\p{L}\p{N}'’]+|[^\p{L}\p{N}\s'’]+|\s+/gu) || [];
+    const a = split(was), b = split(now);
+    if (a.length * b.length > 250000) return [{ op: 'del', text: String(was) }, { op: 'add', text: String(now) }];   // too long to compare
+    // Longest common sequence of pieces (spaces don't anchor a match), then walk it
+    const key = t => /^\s+$/.test(t) ? ' ' : t;
+    const n = a.length, m = b.length, L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) {
+      L[i][j] = key(a[i]) === key(b[j]) && key(a[i]) !== ' ' ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    }
+    const out = [], push = (op, text) => { const last = out[out.length - 1]; if (last && last.op === op) last.text += text; else out.push({ op, text }); };
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+      if (key(a[i]) === key(b[j]) && (key(a[i]) !== ' ' || L[i][j] === L[i + 1][j + 1])) { push('same', b[j]); i++; j++; }
+      else if (L[i + 1][j] >= L[i][j + 1]) push('del', a[i++]);
+      else push('add', b[j++]);
+    }
+    while (i < n) push('del', a[i++]);
+    while (j < m) push('add', b[j++]);
+    // A changed space between kept words isn't a change worth showing
+    return out.map(p => p.op !== 'same' && /^\s+$/.test(p.text) ? { op: 'same', text: p.op === 'del' ? '' : p.text } : p).filter(p => p.text);
   }
   // Lines only in one version ([{ was, now }]); a removed line much like an added one is shown as changed
   function changedLines(was, now) {
@@ -693,21 +749,42 @@
     for (const a of added) out.push({ was: null, now: a });
     return out;
   }
+  // Text as it reads, for comparing: line breaks and runs of spaces don't count as changes
+  const flat = s => String(s || '').replace(/\s+/g, ' ').trim();
+  // Captions and notes by sentence. A caption is one line on screen, and where the lines break moves whenever the
+  // wording changes, so each clip's captions (lines with the same "[Layer n] " label) are read as one text first.
+  const SENTENCE_END = /(?<=[.!?…]["”’)\]]*)\s+(?=["“‘(\[]?[A-Z0-9])/;
+  function sentences(lines) {
+    const byLabel = new Map();
+    for (const line of lines || []) {
+      const m = /^(\[[^\]]+\] )?([\s\S]*)$/.exec(String(line));
+      const label = m[1] || '';
+      byLabel.set(label, (byLabel.has(label) ? byLabel.get(label) + ' ' : '') + m[2]);
+    }
+    const out = [];
+    for (const [label, text] of byLabel) for (const s of flat(text).split(SENTENCE_END)) if (s) out.push(label + s);
+    return out;
+  }
+  // A clip's captions (one caption per line, as captionsText gives them) as one sentence per line
+  const captionSentences = text => sentences(String(text || '').split('\n')).join('\n');
   // From old to new: slides added, removed, moved or renamed, and text, closed captions and notes changed on each
   // slide. Captions are compared only when both versions were kept with them (versions kept before 1.6.0 weren't).
   function compareSnapshots(old, now) {
     const before = new Map(old.slides.map(s => [s.id, s]));
     const after = new Map(now.slides.map(s => [s.id, s]));
     const withCaptions = !!(old.hasCaptions && now.hasCaptions);
+    // A slide has "moved" only if both versions number slides the same way (a version kept before 1.7.0 by scene)
+    const sameNumbering = (old.numbering || 'scene') === (now.numbering || 'scene');
     const out = { added: [], removed: [], changed: [], unchanged: 0, notChecked: 0, captionsCompared: withCaptions };
     for (const s of now.slides) {
       const o = before.get(s.id);
       if (!o) { out.added.push({ id: s.id, number: s.number, title: s.title }); continue; }
       if (!s.text || !o.text) { out.notChecked++; continue; }
-      const change = { id: s.id, number: s.number, title: s.title, moved: o.number !== s.number ? o.number : '', renamed: o.title !== s.title ? o.title : '',
-        text: changedLines(o.text, s.text), captions: withCaptions ? changedLines(o.captions || [], s.captions || []) : [], notes: null };
-      if (o.notes !== s.notes) change.notes = { was: o.notes, now: s.notes };
-      if (change.moved || change.renamed || change.text.length || change.captions.length || change.notes) out.changed.push(change); else out.unchanged++;
+      const change = { id: s.id, number: s.number, title: s.title, moved: sameNumbering && o.number !== s.number ? o.number : '', renamed: o.title !== s.title ? o.title : '',
+        text: changedLines(o.text.map(flat), s.text.map(flat)),
+        captions: withCaptions ? changedLines(sentences(o.captions), sentences(s.captions)) : [],
+        notes: changedLines(sentences([o.notes]), sentences([s.notes])) };
+      if (change.moved || change.renamed || change.text.length || change.captions.length || change.notes.length) out.changed.push(change); else out.unchanged++;
     }
     for (const o of old.slides) if (!after.has(o.id)) out.removed.push({ id: o.id, number: o.number, title: o.title });
     return out;
@@ -842,7 +919,7 @@
 
   const api = { readProvided, frameInfo, changeFrame, slideLayouts, nextSlidePath, addMissingNav, hiddenNav, countLocks, changeSlideLocks, slideFiles, questionSlides,
     buildQuizKey, applyAnswers, questionText, describeCondition, numberFor, QUESTION_TYPES, NAV_CONTROLS,
-    completionInfo, seatTime, slideText, slideMedia, captionsText, slideNotes, htmlToText, courseSnapshot, compareSnapshots, slideIndex, slideOf, findActions, explainSlide, describeStatement, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
+    completionInfo, seatTime, menuNumbers, slideText, slideMedia, captionsText, captionSentences, wordChanges, slideNotes, htmlToText, courseSnapshot, compareSnapshots, slideIndex, slideOf, findActions, explainSlide, describeStatement, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else Object.defineProperty(root, '__storylineReviewCore', { value: api });   // hidden from the course's own scripts' enumeration
 })(typeof globalThis !== 'undefined' ? globalThis : this);

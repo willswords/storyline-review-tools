@@ -57,6 +57,9 @@ button.small:hover{border-color:var(--accent);color:var(--accent)}
 .vers-summary b{font-weight:600}
 .vers-list{margin:6px 0 0;padding-left:18px;font-size:12px;display:flex;flex-direction:column;gap:6px}
 .vers-list .what{color:var(--muted);font-size:11px}
+.vers-list li.here{background:color-mix(in srgb,var(--accent) 10%,transparent);box-shadow:-18px 0 0 color-mix(in srgb,var(--accent) 10%,transparent);border-radius:0 6px 6px 0;padding:4px 6px 4px 0}
+.vers-list li.here::marker{color:var(--accent)}
+.vers-list .here-tag{display:inline-block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--accent-text);background:var(--accent);border-radius:999px;padding:0 7px;vertical-align:1px}
 .vers-list a.go{color:var(--accent);text-decoration:none}
 .vers-list a.go:hover{text-decoration:underline}
 .vers-list a.go:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:2px}
@@ -65,6 +68,10 @@ button.small:hover{border-color:var(--accent);color:var(--accent)}
 .vers-list .pair{margin-top:2px;padding-left:8px;border-left:2px solid var(--border);overflow-wrap:anywhere}
 .vers-list .pair .was{color:var(--err);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--err) 60%,transparent)}
 .vers-list .pair .now{color:var(--ok)}
+/* Word by word: removed words bold in the old text; added words bold and highlighted, and removals marked, in the new */
+.vers-list .pair b.del{font-weight:700}
+.vers-list .pair b.ins{font-weight:700;color:var(--text);background:color-mix(in srgb,var(--ok) 22%,transparent);border-radius:3px;padding:0 2px}
+.vers-list .pair .cut{color:var(--err);font-weight:700;cursor:help;padding:0 1px}
 .slide-name{font-size:12px;color:var(--muted);margin-bottom:6px}
 .slide-text{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
 .slide-text[hidden]{display:none}

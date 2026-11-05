@@ -13,7 +13,7 @@
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {}; } catch (e) {}
   // The settings this page load uses (sent with every state, so bridge.js can tell if they're out of date)
-  const settings = { freeNav: !!saved.freeNav, seekbar: !!saved.seekbar, nav: !!saved.nav, unhide: !!saved.unhide, answers: !!saved.answers };
+  const settings = { freeNav: !!saved.freeNav, seekbar: !!saved.seekbar, nav: !!saved.nav, unhide: !!saved.unhide, menuNumbers: !!saved.menuNumbers, answers: !!saved.answers };
 
   // What the side panel shows: what the course does, and what was changed
   const state = {
@@ -35,6 +35,7 @@
   const startedAt = Date.now();
   let data = null;                      // data.js, as published
   let notes = null;                     // each slide's notes, from frame.js (core.slideNotes)
+  let menuNumbers = null;               // each slide's number in the course menu, from frame.js (core.menuNumbers)
   const slideCache = new Map();         // html5url → slide JSON as published
   const fileOfSlide = new Map();        // slide id → html5url
   const lockCounts = new Map();         // html5url (or '#data' for slides inside data.js) → { nav, seek, layouts }
@@ -205,7 +206,8 @@
     if (!media.length) return;
     into.captions = [];
     into.captionsLoading = true;
-    Promise.all(media.map(m => captionsFile(m.file).then(text => text ? { layer: m.layer, name: m.name, text } : null)))
+    // (one sentence per line, not one caption per line, which breaks mid-sentence)
+    Promise.all(media.map(m => captionsFile(m.file).then(text => text ? { layer: m.layer, name: m.name, text: core.captionSentences(text) } : null)))
       .then(list => { into.captions = list.filter(Boolean); into.captionsLoading = false; });
   }
 
@@ -400,6 +402,9 @@
       const frame = JSON.parse(json);
       state.frame = core.frameInfo(frame);
       notes = core.slideNotes(frame);
+      // Slides are numbered as the menu numbers them (on this copy of data.js, which the course never sees)
+      menuNumbers = core.menuNumbers(frame);
+      if (data) { data.menuNumbers = menuNumbers; updateCompletion(); }
       const n = core.changeFrame(frame, settings);
       state.changed.frame = n;
       sendState();
@@ -408,6 +413,7 @@
     if (kind === 'data') {
       const published = JSON.parse(json);
       data = JSON.parse(json);   // kept unchanged for the answer key
+      if (menuNumbers) data.menuNumbers = menuNumbers;
       for (const scene of data.scenes || []) for (const s of scene.slides || []) if (s.html5url) fileOfSlide.set(s.id, s.html5url);
       for (const s of (data.slideBank && data.slideBank.slides) || []) if (s.html5url) fileOfSlide.set(s.id, s.html5url);
       // Slides embedded in data.js have their triggers here

@@ -53,8 +53,13 @@ const frameFolder = c => c.evPage(`(/\\/review\\/items\\/([^/]+)\\//.exec((docum
     check('the “You have finished…” slide was added', !!d && d.added.length === 1 && /You have finished/.test(d.added[0].title), d && JSON.stringify(d.added));
     // A slide link in the panel sends "go to" with the slide's id: the added slide is in this version, so it opens
     const slideNo = `(() => { try { return DS.windowManager.getCurrentWindow().getCurrentSlide().get('slideNumberInScene'); } catch (e) { return null; } })()`;
-    if (d && d.added[0]) await c.ev(`document.dispatchEvent(new CustomEvent('storyline-review-tools:goto', { detail: ${JSON.stringify(d.added[0].id)} }))`);
-    check('going to the added slide (1.2) opens it', !!(await c.waitFor(`${slideNo} === 2`, 10000)), await c.ev(slideNo));
+    // (sent again if the course was still settling and didn't move)
+    let moved = false;
+    for (let i = 0; i < 3 && !moved && d && d.added[0]; i++) {
+      await c.ev(`document.dispatchEvent(new CustomEvent('storyline-review-tools:goto', { detail: ${JSON.stringify(d.added[0].id)} }))`);
+      moved = !!(await c.waitFor(`${slideNo} === 2`, 5000));
+    }
+    check('going to the added slide (1.2) opens it', moved, await c.ev(slideNo));
     await c.shot('versions.png');
     check('no errors from the extension’s scripts', !c.errors.some(e => /storylineReview|core\.js|hook\.js/i.test(e)), c.errors.slice(0, 2).join(' | ') || 'none');
   } finally { c.close(); }

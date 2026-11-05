@@ -11,13 +11,18 @@ const LOCKED_ITEMS = `[...document.querySelectorAll('#outline-content .cs-listit
   const url = courses().navigation;
   for (const on of [false, true]) {
     console.log(`--- settings ${on ? 'on' : 'off'}`);
-    const c = await openCourse(url, { freeNav: on, seekbar: on, nav: on, answers: on });
+    const c = await openCourse(url, { freeNav: on, seekbar: on, nav: on, menuNumbers: on, answers: on });
     try {
       const st = await c.ready();
       check('the hook runs and reads every slide', !!st, st ? JSON.stringify(st.locks) : 'no state');
       if (!st) continue;
       await sleep(2000);
       const locked = await c.ev(LOCKED_ITEMS);
+      // Number the menu entries: the published menu has no numbers; with the setting on, "1.1." and so on
+      const firstSlide = await c.ev(`(() => { const e = document.querySelector('#outline-content .cs-listitem[data-ref*="."]') || document.querySelectorAll('#outline-content .cs-listitem')[1]; return e ? e.textContent.trim().replace(/\\s+/g, ' ') : ''; })()`);
+      // (an entry's text starts with its screen-reader label, then shows the number and title)
+      const NUMBER = /(^|\s)\d+(\.\d+)*\. \S/;
+      check(on ? 'menu entries are numbered (“Number the menu entries”)' : 'menu entries aren’t numbered, as published', on ? NUMBER.test(firstSlide) : !NUMBER.test(firstSlide), firstSlide.slice(0, 60));
       if (!on) {
         check('the published menu is "restricted"', st.frame && st.frame.flow === 'restricted', st.frame && st.frame.flow);
         check('the menu locks slides not viewed yet', locked > 0, locked);

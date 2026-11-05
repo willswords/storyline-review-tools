@@ -106,12 +106,12 @@ async function opened(name, url, settings = {}) {
     try {
       const crit = comp && comp.info && comp.info.criteria;
       check('tracking is the quiz result, with a 100% pass mark', crit && crit.length === 1 && crit[0].kind === 'quiz' && /100%/.test(crit[0].text), JSON.stringify(crit));
-      check('the results slide 1.3 reports it', crit && crit[0].where.some(w => w.number === '1.3'), crit && JSON.stringify(crit[0].where));
+      check('the results slide 1.3 reports it', crit && crit[0].where.some(w => w.number.startsWith('1.3')), crit && JSON.stringify(crit[0].where));
       check('Next goes to the question', await next(c, 2));
       await answer(c, 1);   // False: wrong
       let after = await statusIs(c, 'fail');
       let h = after && lastStatus(after);
-      check('a wrong answer reports Failed on the results slide', !!h && h.reason === 'quiz result' && h.slide && h.slide.number === '1.3', JSON.stringify(h));
+      check('a wrong answer reports Failed on the results slide', !!h && h.reason === 'quiz result' && h.slide && h.slide.number.startsWith('1.3'), JSON.stringify(h));
       check('… with a score of 0%', after && after.score === 0, after && after.score);
       await c.shot('completion-quiz-failed.png');
       await clickButton(c, 'Retry Quiz');

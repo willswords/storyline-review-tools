@@ -8,7 +8,7 @@
   'use strict';
   const SETTINGS_KEY = 'storylineReviewTools.settings';
   const RELOADS_KEY = 'storylineReviewTools.reloads';
-  const norm = s => ({ freeNav: !!(s && s.freeNav), seekbar: !!(s && s.seekbar), nav: !!(s && s.nav), unhide: !!(s && s.unhide), answers: !!(s && s.answers) });
+  const norm = s => ({ freeNav: !!(s && s.freeNav), seekbar: !!(s && s.seekbar), nav: !!(s && s.nav), unhide: !!(s && s.unhide), menuNumbers: !!(s && s.menuNumbers), answers: !!(s && s.answers) });
   const same = (a, b) => JSON.stringify(norm(a)) === JSON.stringify(norm(b));
 
   let wanted = null;      // the extension's settings

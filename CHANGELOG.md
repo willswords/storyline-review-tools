@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0 (2026-11-05)
+
+- **Number the menu entries**, a new option: the course menu shows each entry numbered (1.1, 1.2…), by turning on the player's "Number entries automatically" menu setting (`autonumber` in `frame.js`) as the course loads. It's greyed out when the menu is already numbered.
+- **Slide numbers match the course menu.** This slide, Changes since an earlier version and Completion number slides as the menu does (from the menu's outline in `frame.js`), instead of by scene, so a slide grouped under the menu's 6th heading is "6.3" in the panel too. A slide that isn't in the menu keeps its scene number, marked "(not in menu)". A version kept before 1.7.0 has scene numbers, so slides aren't reported as moved when comparing with it.
+
+- **Changes since an earlier version ignores line breaks.** Captions are compared sentence by sentence: each clip's captions are read as one text first, so captions whose line breaks moved after a rewording no longer show as changed, only the sentence that was reworded. Notes are compared by sentence too (listed as "Notes:"), and line breaks and spacing inside slide text don't count as changes. Versions already kept by 1.6.0 and 1.6.1 compare the same way.
+- **The slide you're on is marked** in Changes since an earlier version: highlighted and tagged "You're on this slide", following you through the course.
+- **The exact words that changed stand out.** Changed lines are compared word by word (punctuation counts as its own word): added words are bold and highlighted in the new text, a red “[…]” marks where words were removed (pointing at it shows them), and the removed words are bold in the struck-through old text.
+- **Copy text doesn't break sentences across lines.** Captions are shown one sentence per line, instead of one caption per line. In slide text, a line break inside a paragraph is a space, and a paragraph that carries on a sentence joins the one before: one that starts with a small letter, "&", a dash or a comma, or follows one ending in a word like "and", "of" or "the" (so "Team Member Safety and" / "Workplace Violence" reads as one title). Separate paragraphs, such as list items, stay on their own lines.
+
 ## 1.6.1 (2026-11-05)
 
 - **Changes since an earlier version compares closed captions**, caption by caption, shown under each slide as "Captions: “old” → “new”". Each version is now kept with its captions (read from each clip's captions file, four at a time, when the version opens). Versions kept by 1.6.0 have no captions, so the panel says captions weren't compared until that version is opened again.

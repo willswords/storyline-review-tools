@@ -140,6 +140,7 @@ function render(st) {
   }
   renderAllNav();
   renderSlide(st && st.current);
+  renderVersions(st && st.versions);
   renderCompletion(st && st.completion);
   renderQuiz(st && st.quiz);
 }
@@ -147,16 +148,21 @@ function render(st) {
 // Copy text: all the slide's text in a box, to select part of and paste into a Review comment. The box keeps what's
 // in it (and any selection) while the same slide is showing; it's filled again when the slide changes.
 let textFor = null;
-// The slide's text by layer, then its notes (under the Notes tab's name in the course, such as "Transcript")
+// The slide's text by layer, then the closed captions of its audio and video, then its notes (under the Notes tab's
+// name in the course, such as "Transcript")
 const slideTextOf = cur => {
-  const parts = cur.text.map(l => (cur.text.length > 1 || l.layer !== 'Base layer' || cur.notes ? '— ' + l.layer + ' —\n' : '') + l.texts.join('\n\n'));
+  const caps = cur.captions || [];
+  const parts = cur.text.map(l => (cur.text.length > 1 || l.layer !== 'Base layer' || cur.notes || caps.length ? '— ' + l.layer + ' —\n' : '') + l.texts.join('\n\n'));
+  for (const c of caps) parts.push('— Closed captions: ' + c.name + (c.layer !== 'Base layer' ? ' (' + c.layer + ')' : '') + ' —\n' + c.text);
+  if (cur.captionsLoading) parts.push('(Loading the closed captions…)');
   if (cur.notes) parts.push('— ' + cur.notes.label + ' (notes) —\n' + cur.notes.text);
-  return parts.join('\n\n');
+  return parts.length ? parts.join('\n\n') : '(No text on this slide.)';
 };
+let filledWith = '';
 function fillSlideText(cur) {
   textFor = cur.slideId;
   $('slideTextLabel').textContent = 'Text on slide ' + cur.number + (cur.title ? ' “' + cur.title + '”' : '');
-  $('slideText').value = cur.text.length || cur.notes ? slideTextOf(cur) : '(No text on this slide.)';
+  $('slideText').value = filledWith = slideTextOf(cur);
 }
 function showSlideText(open) {
   $('slideTextBox').hidden = !open;
@@ -176,7 +182,8 @@ $('btnCopyAll').addEventListener('click', async e => {
 function renderSlide(cur) {
   $('slideSec').hidden = !cur;
   if (!cur) { showSlideText(false); return; }
-  if (!$('slideTextBox').hidden && textFor !== cur.slideId) fillSlideText(cur);
+  // Filled again for a new slide, or when the captions arrive (unless the reviewer has edited the text meanwhile)
+  if (!$('slideTextBox').hidden && (textFor !== cur.slideId || ($('slideText').value === filledWith && slideTextOf(cur) !== filledWith))) fillSlideText(cur);
   $('slideName').innerHTML = 'Slide <b>' + esc(cur.number) + '</b>' + (cur.title ? ' “' + esc(cur.title) + '”' : '');
   const on = key => state && state.settings[key];
   const part = (btn, label) => {
@@ -206,6 +213,57 @@ function renderSlide(cur) {
     (cur.jumps.length ? '<div><div class="btn-head">Buttons on this slide</div><ul>' + cur.jumps.map(j => '<li class="free">“' + esc(j.name) + '” goes to ' + esc(j.to) + '.</li>').join('') + '</ul></div>' : '') +
     (vals.length ? '<div class="now">Now: ' + vals.map(([k, v]) => esc(k) + ' = ' + esc(typeof v === 'boolean' ? (v ? 'True' : 'False') : JSON.stringify(v))).join(', ') + '</div>' : '');
 }
+
+// Changes since an earlier version: the versions of this course opened in this browser, and what changed
+// "Published 10/31/2026 at 8:09 PM", as Review's version menu shows it
+const publishedOn = iso => {
+  const d = new Date(iso);
+  return isNaN(d) ? 'an earlier version' : 'Published ' + d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric' }) +
+    ' at ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+};
+$('versPick').addEventListener('change', e => { chrome.tabs.sendMessage(tabId, { type: 'compare', folder: e.target.value }).catch(() => {}); });
+const quoted = s => '“' + esc(s.length > 400 ? s.slice(0, 399) + '…' : s) + '”';
+function renderVersions(v) {
+  $('versSec').hidden = !v;
+  if (!v) return;
+  const has = v.others.length > 0;
+  $('versNone').hidden = has;
+  $('versSome').hidden = !has;
+  const d = v.diff;
+  const total = d ? d.added.length + d.removed.length + d.changed.length : 0;
+  $('versCount').hidden = !d;
+  $('versCount').textContent = total;
+  if (!has) return;
+  // The list of versions to compare with (kept as it is while the user is choosing)
+  const pick = $('versPick');
+  const opts = v.others.map(o => '<option value="' + esc(o.folder) + '"' + (o.folder === v.comparedWith ? ' selected' : '') + '>' +
+    esc(publishedOn(o.published) + ' · ' + o.slides + ' slide' + (o.slides === 1 ? '' : 's')) + '</option>').join('');
+  if (pick.dataset.opts !== opts) { pick.innerHTML = opts; pick.dataset.opts = opts; }
+  if (!d) { $('versSummary').textContent = ''; $('versList').innerHTML = ''; return; }
+  const parts = [d.changed.length && d.changed.length + ' changed', d.added.length && d.added.length + ' added', d.removed.length && d.removed.length + ' removed'].filter(Boolean);
+  $('versSummary').innerHTML = (v.thisIsNewer ? 'From that version to this one: ' : 'This version is the older one. From this version to that one: ') +
+    (parts.length ? '<b>' + parts.join(', ') + '</b> slide' + (total === 1 ? '' : 's') : '<b>no changes</b> in the text') + (d.unchanged ? '; ' + d.unchanged + ' unchanged' : '') + '.' +
+    (d.notChecked ? ' ' + d.notChecked + ' slide(s) couldn’t be read.' : '');
+  // A slide in the version showing is a link that goes to it; one only in the other version is plain text
+  const name = s => 'Slide ' + esc(s.number) + (s.title ? ' “' + esc(s.title) + '”' : '');
+  const slide = (s, here = true) => here && s.id ? '<a href="#" class="go" data-slide="' + esc(s.id) + '" title="Go to this slide">' + name(s) + '</a>' : name(s);
+  $('versList').innerHTML =
+    d.changed.map(c => '<li>' + slide(c) +
+      [c.moved ? 'moved from slide ' + esc(c.moved) : '', c.renamed ? 'renamed from “' + esc(c.renamed) + '”' : ''].filter(Boolean).map(t => '<div class="what">' + t + '</div>').join('') +
+      c.text.map(t => '<div class="pair">' + (t.was != null && t.now != null ? '<span class="was">' + quoted(t.was) + '</span> → <span class="now">' + quoted(t.now) + '</span>'
+        : t.now != null ? '<span class="add">Added</span> ' + quoted(t.now) : '<span class="del">Removed</span> ' + quoted(t.was)) + '</div>').join('') +
+      (c.notes ? '<div class="pair">Notes ' + (c.notes.was && c.notes.now ? 'changed: <span class="was">' + quoted(c.notes.was) + '</span> → <span class="now">' + quoted(c.notes.now) + '</span>'
+        : c.notes.now ? '<span class="add">added</span>: ' + quoted(c.notes.now) : '<span class="del">removed</span>') + '</div>' : '') + '</li>').join('') +
+    d.added.map(s => '<li><span class="add">Added</span> ' + slide(s, v.thisIsNewer) + '</li>').join('') +
+    d.removed.map(s => '<li><span class="del">Removed</span> ' + slide(s, !v.thisIsNewer) + ' <span class="what">(its number in the older version)</span></li>').join('');
+}
+// A slide link: go to that slide in the course
+$('versList').addEventListener('click', e => {
+  const a = e.target.closest('a.go');
+  if (!a) return;
+  e.preventDefault();
+  chrome.tabs.sendMessage(tabId, { type: 'goto', slide: a.dataset.slide }).catch(() => {});
+});
 
 // Estimated seat time (core.seatTime): rounded to the minute, as a catalogue would list it
 const minutes = ms => {

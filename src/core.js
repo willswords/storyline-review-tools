@@ -592,6 +592,42 @@
     return out;
   }
 
+  // Closed captions: each audio or video clip in data.js "assetLib" can name a captions file,
+  //   { "id": 59, "url": "story_content/….mp3", "captions": "story_content/60doakqCMTk_captions.js" }
+  // which is window.globalLoadJsAsset('<file>', {"captions":[{"langCode":"en-US","data":"<WebVTT, URL-encoded>"}]}).
+  // A slide plays a clip from a layer's audio ("audiolib":[{"assetId":59}]) or a video object ("videodata":{"assetId":94}).
+  // The captions of the clips on a slide, in layer order: [{ layer, name, file }]
+  function slideMedia(slide, data) {
+    const assets = new Map(((data && data.assetLib) || []).filter(a => a && a.captions).map(a => [a.id, a]));
+    const out = [];
+    (Array.isArray(slide && slide.slideLayers) ? slide.slideLayers : []).forEach((layer, i) => {
+      const name = i === 0 ? 'Base layer' : 'Layer ' + (i + 1);
+      const add = (id, what) => { const a = assets.get(id); if (a && !out.some(m => m.file === a.captions)) out.push({ layer: name, name: what, file: a.captions }); };
+      for (const au of Array.isArray(layer && layer.audiolib) ? layer.audiolib : []) if (au) add(au.assetId, 'Audio');
+      walk(layer && layer.objects, o => {
+        const v = o.data && (o.data.videodata || o.data.audiodata);
+        if (v && v.assetId != null) add(v.assetId, o.data.videodata ? 'Video' + (v.altText ? ' “' + plain(v.altText) + '”' : '') : 'Audio');
+      });
+    });
+    return out;
+  }
+  // A captions file's text: the cues' words, one cue per line (the first language, if there are several)
+  function captionsText(fileText) {
+    const m = /globalLoadJsAsset\(\s*'[^']*'\s*,\s*(\{[\s\S]*\})\s*\)\s*;?\s*$/.exec(String(fileText || ''));
+    if (!m) return '';
+    let vtt = '';
+    try { const c = JSON.parse(m[1]).captions; vtt = decodeURIComponent((c && c[0] && c[0].data) || ''); } catch (e) { return ''; }
+    const lines = [];
+    for (const block of vtt.replace(/\r\n?/g, '\n').split(/\n{2,}/)) {
+      const rows = block.split('\n').map(r => r.trim()).filter(Boolean);
+      const at = rows.findIndex(r => /-->/.test(r));
+      if (at < 0) continue;   // the WEBVTT header, NOTE and STYLE blocks
+      const text = rows.slice(at + 1).join(' ').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+      if (text) lines.push(text);
+    }
+    return lines.join('\n');
+  }
+
   // Each slide's notes (the player's Notes tab, which a course may rename, for example "Transcript"): in frame.js,
   //   "notesData": [{ "slideId": "<scene>.<slide>", "content": "<p …><span …>…</span></p>…" }]
   // and the tab's name in "stringTables" ("transcript"). Returns { label, bySlide: { slideId: text } }.
@@ -611,6 +647,54 @@
     let label = '';
     for (const t of Object.values((frame && frame.stringTables) || {})) if (!label && t && t.string && typeof t.string.transcript === 'string') label = t.string.transcript.trim();
     return { label: label || 'Notes', bySlide };
+  }
+
+  // ── What changed between two versions of a course ──
+  // Review keeps each version of a course in its own folder, but the course frame can't see the list of versions.
+  // So the text of each version opened is kept (courseSnapshot), and a later version is compared with it. Slides
+  // are matched by their id, which stays the same when a Storyline project is republished; the course is matched
+  // by data.js "courseId" (a copy of a project made with Save As keeps it too, so the course title is shown).
+  function courseSnapshot(data, slideData, notes) {
+    const slides = [];
+    for (const s of slideIndex(data).values()) {
+      const sd = s.slide.html5url ? slideData(s.slide.html5url) : s.slide;
+      const text = sd && sd.slideLayers ? slideText(sd).flatMap(l => l.texts.map(t => (l.layer === 'Base layer' ? '' : '[' + l.layer + '] ') + t)) : null;
+      slides.push({ id: s.id, number: s.number, title: s.title, text, notes: (notes && notes.bySlide[s.id]) || '' });
+    }
+    return { courseId: data.courseId || data.projectId || '', title: slides.length ? slides[0].title : '', slides };
+  }
+  // How alike two texts are, by the words they share (0 to 1): to pair a removed text box with the one that replaced it
+  const wordsOf = s => String(s).toLowerCase().match(/[a-z0-9']+/g) || [];
+  function alike(a, b) {
+    const wa = wordsOf(a), wb = new Set(wordsOf(b));
+    if (!wa.length || !wb.size) return 0;
+    const shared = wa.filter(w => wb.has(w)).length;
+    return 2 * shared / (wa.length + wb.size);
+  }
+  // From old to new: slides added, removed, moved or renamed, and text and notes changed on each slide
+  function compareSnapshots(old, now) {
+    const before = new Map(old.slides.map(s => [s.id, s]));
+    const after = new Map(now.slides.map(s => [s.id, s]));
+    const out = { added: [], removed: [], changed: [], unchanged: 0, notChecked: 0 };
+    for (const s of now.slides) {
+      const o = before.get(s.id);
+      if (!o) { out.added.push({ id: s.id, number: s.number, title: s.title }); continue; }
+      if (!s.text || !o.text) { out.notChecked++; continue; }
+      const change = { id: s.id, number: s.number, title: s.title, moved: o.number !== s.number ? o.number : '', renamed: o.title !== s.title ? o.title : '', text: [], notes: null };
+      // Text boxes only in one version; a removed one much like an added one is shown as changed
+      const removed = o.text.filter(t => !s.text.includes(t)), added = s.text.filter(t => !o.text.includes(t));
+      for (const r of removed) {
+        let best = -1, score = 0.5;
+        added.forEach((a, i) => { const x = alike(r, a); if (x > score) { score = x; best = i; } });
+        if (best >= 0) change.text.push({ was: r, now: added.splice(best, 1)[0] });
+        else change.text.push({ was: r, now: null });
+      }
+      for (const a of added) change.text.push({ was: null, now: a });
+      if (o.notes !== s.notes) change.notes = { was: o.notes, now: s.notes };
+      if (change.moved || change.renamed || change.text.length || change.notes) out.changed.push(change); else out.unchanged++;
+    }
+    for (const o of old.slides) if (!after.has(o.id)) out.removed.push({ id: o.id, number: o.number, title: o.title });
+    return out;
   }
 
   // ── 6. Estimated seat time: how long the course takes to go through once ──
@@ -742,7 +826,7 @@
 
   const api = { readProvided, frameInfo, changeFrame, slideLayouts, nextSlidePath, addMissingNav, hiddenNav, countLocks, changeSlideLocks, slideFiles, questionSlides,
     buildQuizKey, applyAnswers, questionText, describeCondition, numberFor, QUESTION_TYPES, NAV_CONTROLS,
-    completionInfo, seatTime, slideText, slideNotes, htmlToText, slideIndex, slideOf, findActions, explainSlide, describeStatement, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
+    completionInfo, seatTime, slideText, slideMedia, captionsText, slideNotes, htmlToText, courseSnapshot, compareSnapshots, slideIndex, slideOf, findActions, explainSlide, describeStatement, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else Object.defineProperty(root, '__storylineReviewCore', { value: api });   // hidden from the course's own scripts' enumeration
 })(typeof globalThis !== 'undefined' ? globalThis : this);

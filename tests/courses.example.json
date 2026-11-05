@@ -6,6 +6,7 @@
     "(more courses with quizzes, optional)"
   ],
   "hiddenNav": "A Review link to a course whose slide 1.1 hides Prev and Next, and slide 1.3 hides Next, in their Player features (optional)",
+  "versions": "A Review link to a course with several versions: Version 2 with 3 slides (slide 1.1 “Answer the question correctly…”, a question, Quiz Results), the current one with 2 (“Go to the next slide…”, “You have finished…”) (optional)",
   "completion": {
     "trigger": "A Review link to a 2-slide course tracked by a Complete Course trigger on slide 2 (when its timeline starts)",
     "views": "A Review link to a 2-slide course tracked by slides viewed (all 2)",

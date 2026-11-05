@@ -2,7 +2,7 @@
 // Usage: node tests/run-all.js            (or name some: node tests/run-all.js navigation answers)
 const { spawnSync } = require('child_process');
 const path = require('path');
-const ALL = ['navigation', 'answers', 'question-types', 'completion', 'extension'];
+const ALL = ['navigation', 'answers', 'question-types', 'completion', 'versions', 'extension'];
 const pick = process.argv.slice(2).length ? process.argv.slice(2) : ALL;
 const results = [];
 for (const name of pick) {

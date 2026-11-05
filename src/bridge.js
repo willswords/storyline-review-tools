@@ -55,5 +55,7 @@
     if (!lastState || !lastState.player) return;
     if (msg && msg.type === 'get-state') sendResponse({ state: lastState });
     else if (msg && msg.type === 'reload') { sendResponse({ ok: true }); location.reload(); }
+    else if (msg && msg.type === 'goto') { sendResponse({ ok: true }); document.dispatchEvent(new CustomEvent('storyline-review-tools:goto', { detail: msg.slide || '' })); }
+    else if (msg && msg.type === 'compare') { sendResponse({ ok: true }); document.dispatchEvent(new CustomEvent('storyline-review-tools:compare', { detail: msg.folder || '' })); }
   });
 })();

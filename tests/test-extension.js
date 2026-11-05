@@ -77,6 +77,11 @@ const EXT = path.join(__dirname, '..');
     await P(`document.getElementById('btnCopyText').click(); 1`);
     const box = await P(`({ open: !document.getElementById('slideTextBox').hidden, label: document.getElementById('slideTextLabel').textContent, text: document.getElementById('slideText').value })`);
     check('Copy text opens a box with the slide’s text', box.open && /^Text on slide 1\.1/.test(box.label) && box.text.length > 20 && !/No text on this slide/.test(box.text), box.label + ' | ' + box.text.slice(0, 120).replace(/\n/g, ' ⏎ '));
+    // The narration's closed captions arrive a moment later, and fill in the box (before the notes)
+    const withCaptions = await waitP(`(t => /— Closed captions: Audio —\\n\\S/.test(t) && !/Loading the closed captions/.test(t) && t)(document.getElementById('slideText').value)`, 15000);
+    check('… and the closed captions of its narration, before the notes', !!withCaptions && withCaptions.indexOf('— Closed captions: Audio —') < withCaptions.indexOf('— Transcript (notes) —'),
+      (withCaptions || await P(`document.getElementById('slideText').value`)).replace(/\n/g, ' ⏎ ').slice(0, 200));
+    box.text = withCaptions || box.text;
     const notesAt = box.text.indexOf('— Transcript (notes) —');
     check('… ending with the slide’s notes, under the tab’s name in the course (“Transcript”)', notesAt > 0 && /Welcome to the Team Member Saf/.test(box.text.slice(notesAt)), box.text.slice(Math.max(0, notesAt), notesAt + 120).replace(/\n/g, ' ⏎ '));
     await P(`document.getElementById('btnCopyAll').click(); 1`);
@@ -87,6 +92,8 @@ const EXT = path.join(__dirname, '..');
       const area = await P(`(() => { const r = document.getElementById('slideSec').getBoundingClientRect(); return { y: r.top + scrollY, h: r.height }; })()`);
       saveScreenshot('side-panel-this-slide.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: area.y, width: 400, height: Math.min(area.h, 700), scale: 1 } }, panel)).result.data);
     }
+    // Changes since an earlier version: a fresh browser has opened no earlier version, so it says how to
+    check('Changes since an earlier version starts collapsed, and says how to compare', await P(`!document.getElementById('versSec').hidden && document.getElementById('versSec').classList.contains('collapsed') && !document.getElementById('versNone').hidden`));
     await P(`document.getElementById('btnCloseText').click(); 1`);
     check('Close hides the text box', await P(`document.getElementById('slideTextBox').hidden`));
 

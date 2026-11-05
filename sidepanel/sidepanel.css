@@ -49,6 +49,22 @@ button.small:hover{border-color:var(--accent);color:var(--accent)}
 .sl-foot{margin-top:10px;font-size:11px;color:var(--muted)}
 
 .sl-head{margin-top:12px;font-size:12px;font-weight:600}
+.vers-note{font-size:11px;color:var(--muted);margin-top:6px}
+.vers-note b{color:var(--text)}
+.vers-pick{display:flex;align-items:center;gap:6px;font-size:12px;flex-wrap:wrap}
+.vers-pick select{font:12px var(--sans);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:2px 4px;max-width:100%}
+.vers-summary{font-size:12px;margin-top:8px}
+.vers-summary b{font-weight:600}
+.vers-list{margin:6px 0 0;padding-left:18px;font-size:12px;display:flex;flex-direction:column;gap:6px}
+.vers-list .what{color:var(--muted);font-size:11px}
+.vers-list a.go{color:var(--accent);text-decoration:none}
+.vers-list a.go:hover{text-decoration:underline}
+.vers-list a.go:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:2px}
+.vers-list .add{color:var(--ok)}
+.vers-list .del{color:var(--err)}
+.vers-list .pair{margin-top:2px;padding-left:8px;border-left:2px solid var(--border);overflow-wrap:anywhere}
+.vers-list .pair .was{color:var(--err);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--err) 60%,transparent)}
+.vers-list .pair .now{color:var(--ok)}
 .slide-name{font-size:12px;color:var(--muted);margin-bottom:6px}
 .slide-text{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)}
 .slide-text[hidden]{display:none}

@@ -28,6 +28,8 @@
     completion: { info: null, watching: null, status: null, score: null, history: [] },
     // The slide showing now: what it does to Next and Prev (core.explainSlide), their state on screen, variable values
     current: null,
+    // This version of the course, the earlier versions opened in this browser, and what changed (see compareVersions)
+    versions: null,
     errors: []
   };
   const startedAt = Date.now();
@@ -175,8 +177,9 @@
           if (!slide && !file) for (const sc of data.scenes || []) for (const x of sc.slides || []) if (x.id === id && x.slideLayers) slide = x;
           if (!slide) return;   // not read yet: tried again on the next tick
           const note = notes && notes.bySlide[id];
-          explained = Object.assign(core.explainSlide(slide, data, state.frame), { text: core.slideText(slide), notes: note ? { label: notes.label, text: note } : null });
+          explained = Object.assign(core.explainSlide(slide, data, state.frame), { text: core.slideText(slide), notes: note ? { label: notes.label, text: note } : null, captions: null });
           explainedFor = id;
+          loadCaptions(slide, explained);
         }
         const player = window.GetPlayer && window.GetPlayer();
         const values = {};
@@ -186,6 +189,21 @@
         if (json !== last) { last = json; state.current = cur; sendState(); }
       } catch (e) { /* the player is between slides */ }
     }, 500);
+  }
+
+  // The closed captions of the slide's audio and video, from their captions files (each read once); captions is
+  // [] while they're loading, then [{ layer, name, text }] (the watch above sends them on its next tick)
+  const captionFiles = new Map();
+  function loadCaptions(slide, into) {
+    const media = core.slideMedia(slide, data);
+    if (!media.length) return;
+    into.captions = [];
+    into.captionsLoading = true;
+    Promise.all(media.map(m => {
+      if (!captionFiles.has(m.file)) captionFiles.set(m.file, fetch(new URL(m.file, location.href), { credentials: 'same-origin' })
+        .then(r => r.ok ? r.text() : '').then(core.captionsText).catch(() => ''));
+      return captionFiles.get(m.file).then(text => text ? { layer: m.layer, name: m.name, text } : null);
+    })).then(list => { into.captions = list.filter(Boolean); into.captionsLoading = false; });
   }
 
   // A message over the course when the status changes, like the SCORM Test LMS's. In its own shadow DOM, so the
@@ -271,8 +289,66 @@
     updateLocks(true);
     updateQuiz();
     updateCompletion();
+    try { saveVersion(); } catch (e) { fail('versions', e); }
     sendState();
   }
+
+  // ── Versions: what changed since an earlier version ──
+  // Review serves each version of a course from its own folder (/review/items/<folder>/), and the course frame can't
+  // see Review's list of versions. So each version's text is kept in this frame's localStorage (shared by every
+  // Review course frame in this browser) when it's opened, and compared with the version showing.
+  const VERSIONS_KEY = 'storylineReviewTools.versions', KEEP_VERSIONS = 30, MAX_STORED = 3e6;
+  const thisFolder = (/\/review\/items\/([^/]+)\//.exec(location.pathname) || [])[1] || '';
+  let snapshot = null, compareWith = null;
+  function storedVersions() {
+    try { const v = JSON.parse(localStorage.getItem(VERSIONS_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+  }
+  function saveVersion() {
+    if (!data || !thisFolder) return;
+    const g = window.globals || {};
+    snapshot = Object.assign(core.courseSnapshot(data, f => slideCache.get(f) || null, notes), {
+      folder: thisFolder, title: document.title || '', published: g.publishTimestamp || '', savedAt: new Date().toISOString()
+    });
+    // Newest first; the oldest go when there are too many, or they'd take too much room
+    let all = [snapshot].concat(storedVersions().filter(v => v && v.folder !== thisFolder)).slice(0, KEEP_VERSIONS);
+    for (;;) {
+      const text = JSON.stringify(all);
+      if (text.length < MAX_STORED || all.length <= 1) { try { localStorage.setItem(VERSIONS_KEY, text); } catch (e) { if (all.length > 1) { all = all.slice(0, -1); continue; } } break; }
+      all = all.slice(0, -1);
+    }
+    compareVersions();
+  }
+  // Compare with the chosen version (by default the latest one published before this one), from older to newer
+  function compareVersions() {
+    if (!snapshot) return;
+    const others = storedVersions().filter(v => v && v.folder !== thisFolder && v.courseId === snapshot.courseId)
+      .sort((a, b) => String(b.published).localeCompare(String(a.published)));
+    let other = others.find(v => v.folder === compareWith) || others.find(v => String(v.published) < String(snapshot.published)) || others[0] || null;
+    compareWith = other ? other.folder : null;
+    const thisIsNewer = !other || String(snapshot.published) >= String(other.published);
+    state.versions = {
+      published: snapshot.published,
+      others: others.map(v => ({ folder: v.folder, title: v.title, published: v.published, savedAt: v.savedAt, slides: (v.slides || []).length })),
+      comparedWith: compareWith, thisIsNewer,
+      diff: other ? (thisIsNewer ? core.compareSnapshots(other, snapshot) : core.compareSnapshots(snapshot, other)) : null
+    };
+  }
+  // Go to a slide (from a link in the side panel), as Review does when a comment is clicked: requestSlideForReview,
+  // or in older players (it's in 3.121, not 3.65) the request Next makes. Neither waits for the menu's restrictions.
+  document.addEventListener('storyline-review-tools:goto', e => {
+    try {
+      const wm = window.DS && DS.windowManager, id = String(e.detail || '');
+      const slide = wm && DS.presentation.getFlatSlides().find(s => s.id === id);
+      if (!slide) return;
+      if (typeof wm.requestSlideForReview === 'function') Promise.resolve(wm.requestSlideForReview(slide, '_frame')).catch(err => fail('go to slide', err));
+      else wm.onRequestingSlide(slide.absoluteId, null, 'push');
+    } catch (err) { fail('go to slide', err); }
+  });
+  document.addEventListener('storyline-review-tools:compare', e => {
+    compareWith = typeof e.detail === 'string' ? e.detail : null;
+    try { compareVersions(); } catch (err) { fail('versions', err); }
+    sendState();
+  });
 
   // Text-box answers (fill in the blank, numeric) are course variables bound to the box. They're set through
   // the player's own JavaScript API as the slide loads. Storyline only reads a box's text once the learner

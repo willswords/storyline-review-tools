@@ -44,6 +44,17 @@
   <div id="slideNav"></div>
 </section>
 
+<section id="versSec" data-start-collapsed hidden>
+  <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>Changes since an earlier version</button><span class="count" id="versCount" hidden></span></h2>
+  <div id="versNone" class="vers-note" hidden>No earlier version of this course has been opened in this browser yet. To compare, choose an earlier version from Review’s version menu (<b>Current Version ▾</b> at the top), let it load, then go back to this version.</div>
+  <div id="versSome" hidden>
+    <label class="vers-pick" for="versPick">Compare with <select id="versPick"></select></label>
+    <div class="vers-summary" id="versSummary"></div>
+    <ul class="vers-list" id="versList"></ul>
+  </div>
+  <div class="vers-note">Compares slide titles, text, notes and slide order. Images, media, triggers and layout aren’t compared. Versions are remembered in this browser when they’re opened. Their times are when Storyline published them, which can be a minute or two before the time in Review’s version menu.</div>
+</section>
+
 <section id="compSec" hidden>
   <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>Completion</button></h2>
   <div class="comp-now" id="compNow"></div>

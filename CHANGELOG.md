@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0 (2026-11-05)
+
+- **Changes since an earlier version**, a new side panel section (starts collapsed): for a course republished to Review, the slides added, removed, moved or renamed, and the text and notes changed on each, shown as “old → new”. Pick the version to compare with; by default it's the latest one published before the version showing. Each slide in the list is a link that goes straight to it, even when the menu is restricted (through the player's `requestSlideForReview`, which Review uses for comments, or in older players the request Next makes). Slides are matched by Storyline's slide IDs. Images, media, triggers and layout aren't compared.
+- Each version's text is kept in the browser when it's opened (the most recent 30 versions, in the storage of Review's course pages), since Review doesn't share its list of versions with the course. Nothing is sent anywhere; the privacy policy says so.
+- **Copy text includes closed captions**: the captions of the slide's audio and video (from each clip's captions file, listed in `data.js` `assetLib`), one caption per line, after the slide's text and before its notes. Each clip is labelled ("Closed captions: Audio", "Closed captions: Video “Media1.mp4”"), with its layer if it isn't on the base layer.
+- **Tests:** `test-versions.js` uses Review's own version menu on a course with four versions; the extension test checks the new section's starting message, and the captions in Copy text.
+
 ## 1.5.0 (2026-11-04)
 
 - **Copy text**, in This slide's heading: a box with all the text on the slide you're on, layer by layer, in reading order, to select part of and paste into a Review comment (or **Copy all**). Line breaks inside a paragraph are kept. The slide's notes (the player's Notes tab, from `notesData` in `frame.js`) come last, under the tab's name in the course, such as "Transcript".

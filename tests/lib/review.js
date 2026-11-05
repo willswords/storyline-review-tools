@@ -95,7 +95,15 @@ async function openCourse(url, settings) {
     return click(item);
   };
   const shot = async name => saveScreenshot(name, (await cdp.send('Page.captureScreenshot', { format: 'png' }, page)).result.data);
-  return { ev, waitFor, state, ready, click, goToSlide, shot, errors, close: b.close };
+  // The Review page itself (around the course frame): evaluate there, and click an element by a real mouse click
+  const evPage = expr => cdp.evaluate(expr, page);
+  const clickPage = async selector => {
+    const pt = await evPage(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return null; const r = el.getBoundingClientRect(); return r.width ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null; })()`);
+    if (!pt) return false;
+    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await cdp.send('Input.dispatchMouseEvent', { type, x: pt.x, y: pt.y, button: 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 }, page);
+    return true;
+  };
+  return { ev, waitFor, state, ready, click, goToSlide, shot, evPage, clickPage, errors, close: b.close };
 }
 
 module.exports = { openCourse, injection };

@@ -10,7 +10,7 @@ A Chrome and Edge extension for reviewing Articulate Storyline courses on **Arti
 | **Add Next/Prev buttons where turned off** | Shows Next and Prev on slides whose Player features (slide properties) leave them out, including question slides, where Next appears beside Submit. Next goes to the next slide in the menu, Prev goes back. |
 | **Pre-select correct quiz answers** | Opens question slides with the correct answer already filled in, so you only press Submit. |
 
-The side panel also explains **why you can or can't move on from the slide you're on** (see [This slide](#this-slide)), lists the course's **quiz answers**, as the course scores them, and shows **when the course completes**: what its tracking needs, and the status it reports as you play it (see [Completion](#completion)).
+The side panel also explains **why you can or can't move on from the slide you're on** (see [This slide](#this-slide)), shows **what changed since an earlier version** (see [Changes since an earlier version](#changes-since-an-earlier-version)), lists the course's **quiz answers**, as the course scores them, and shows **when the course completes**: what its tracking needs, and the status it reports as you play it (see [Completion](#completion)).
 
 Nothing is changed on Review. The extension changes what your own browser loads as the course starts, and only while an option is on. Other reviewers, and the published course, aren't affected.
 
@@ -82,9 +82,34 @@ Next  [Not showing]
   No option overrides a trigger that hides it; Free navigation (menu) lets you jump on from the menu.
 ```
 
-**Copy text**, in the section's heading, opens a box with all the text on the slide, layer by layer (base layer first, then "Layer 2", "Layer 3"…, as published layers have no names), top to bottom and left to right. Select the part you want to change, copy it (Ctrl+C) and paste it into your Review comment, or use **Copy all**. It includes text that's hidden at first, such as feedback and pop-ups, and ends with the slide's notes from the player's Notes tab, under the tab's name in the course (often "Transcript"). The box keeps your selection while you stay on the slide, and shows the next slide's text when you move on.
+**Copy text**, in the section's heading, opens a box with all the text on the slide, layer by layer (base layer first, then "Layer 2", "Layer 3"…, as published layers have no names), top to bottom and left to right. Select the part you want to change, copy it (Ctrl+C) and paste it into your Review comment, or use **Copy all**. It includes text that's hidden at first, such as feedback and pop-ups, then the closed captions of the slide's audio and video (one caption per line, as in Storyline's captions editor, labelled with their layer), and ends with the slide's notes from the player's Notes tab, under the tab's name in the course (often "Transcript"). The box keeps your selection while you stay on the slide, and shows the next slide's text when you move on.
 
 When the button isn't available, it says which option gets past it: **Unlock Next/Prev buttons** for a disabled button, **Add Next/Prev buttons where turned off** for one turned off in Player features. Storyline's own trigger that disables Prev on the first slide you open isn't counted as a lock.
+
+### Changes since an earlier version
+
+When a course has been republished to Review, **Changes since an earlier version** shows what's different, so you only need to re-check those slides:
+
+```
+Compare with  [Published 10/31/2026 at 8:08 PM · 3 slides ▾]
+From that version to this one: 1 changed, 1 added, 2 removed slides.
+  • Slide 1.1 "Go to the next slide to finish the course."
+      renamed from "Answer the question correctly to complete the course."
+      "Answer the question correctly…" → "Go to the next slide…"
+  • Added Slide 1.2 "You have finished the course…"
+  • Removed Slide 1.3 "Quiz Results"
+```
+
+Each slide in the list is a link: click it to go straight to that slide, even if the course's menu is restricted (as Review does when you click a comment). A slide that's only in the other version, such as one removed since, isn't a link.
+
+It compares slide titles, text (on every layer), notes and slide order. Slides are matched between versions by Storyline's own slide IDs, so a slide that moved or was renamed is still the same slide. Images, media, triggers and layout aren't compared.
+
+Review doesn't let the extension see its list of versions, so the extension remembers each version **when you open it**: it keeps a copy of the version's text in your browser (the most recent 30 versions), and nothing is sent anywhere. So:
+
+- If you reviewed an earlier version in this browser, opening the new one shows the changes straight away.
+- Otherwise, choose the earlier version from Review's version menu (**Current Version ▾** at the top) and let it load, then go back to the current version.
+
+The section starts collapsed. The times in **Compare with** are when Storyline published each version, which can be a minute or two before the time in Review's version menu.
 
 ### Completion
 

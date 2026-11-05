@@ -49,6 +49,7 @@ const frameFolder = c => c.evPage(`(/\\/review\\/items\\/([^/]+)\\//.exec((docum
     check('slide 1.1 is renamed, and its text changed', !!s11 && /Answer the question correctly/.test(s11.renamed) &&
       s11.text.some(t => /Answer the question/.test(t.was || '') && /Go to the next slide/.test(t.now || '')), s11 && JSON.stringify(s11).slice(0, 300));
     check('the question and Quiz Results slides were removed', !!d && d.removed.some(x => x.title === 'Quiz Results') && d.removed.length === 2, d && JSON.stringify(d.removed));
+    check('closed captions are compared (both versions were kept with them)', !!d && d.captionsCompared === true, d && String(d.captionsCompared));
     check('the “You have finished…” slide was added', !!d && d.added.length === 1 && /You have finished/.test(d.added[0].title), d && JSON.stringify(d.added));
     // A slide link in the panel sends "go to" with the slide's id: the added slide is in this version, so it opens
     const slideNo = `(() => { try { return DS.windowManager.getCurrentWindow().getCurrentSlide().get('slideNumberInScene'); } catch (e) { return null; } })()`;

@@ -223,6 +223,8 @@ const publishedOn = iso => {
 };
 $('versPick').addEventListener('change', e => { chrome.tabs.sendMessage(tabId, { type: 'compare', folder: e.target.value }).catch(() => {}); });
 const quoted = s => '“' + esc(s.length > 400 ? s.slice(0, 399) + '…' : s) + '”';
+// Old text, then the new text on its own line after the arrow, so the two line up for reading
+const wasNow = (was, now) => '<span class="was">' + quoted(was) + '</span> →<br><span class="now">' + quoted(now) + '</span>';
 function renderVersions(v) {
   $('versSec').hidden = !v;
   if (!v) return;
@@ -243,16 +245,18 @@ function renderVersions(v) {
   const parts = [d.changed.length && d.changed.length + ' changed', d.added.length && d.added.length + ' added', d.removed.length && d.removed.length + ' removed'].filter(Boolean);
   $('versSummary').innerHTML = (v.thisIsNewer ? 'From that version to this one: ' : 'This version is the older one. From this version to that one: ') +
     (parts.length ? '<b>' + parts.join(', ') + '</b> slide' + (total === 1 ? '' : 's') : '<b>no changes</b> in the text') + (d.unchanged ? '; ' + d.unchanged + ' unchanged' : '') + '.' +
-    (d.notChecked ? ' ' + d.notChecked + ' slide(s) couldn’t be read.' : '');
+    (d.notChecked ? ' ' + d.notChecked + ' slide(s) couldn’t be read.' : '') +
+    (d.captionsCompared === false ? ' Closed captions weren’t compared: one of the versions was saved before captions were, or they couldn’t be read. Open it again to update it.' : '');
   // A slide in the version showing is a link that goes to it; one only in the other version is plain text
   const name = s => 'Slide ' + esc(s.number) + (s.title ? ' “' + esc(s.title) + '”' : '');
   const slide = (s, here = true) => here && s.id ? '<a href="#" class="go" data-slide="' + esc(s.id) + '" title="Go to this slide">' + name(s) + '</a>' : name(s);
   $('versList').innerHTML =
     d.changed.map(c => '<li>' + slide(c) +
       [c.moved ? 'moved from slide ' + esc(c.moved) : '', c.renamed ? 'renamed from “' + esc(c.renamed) + '”' : ''].filter(Boolean).map(t => '<div class="what">' + t + '</div>').join('') +
-      c.text.map(t => '<div class="pair">' + (t.was != null && t.now != null ? '<span class="was">' + quoted(t.was) + '</span> → <span class="now">' + quoted(t.now) + '</span>'
-        : t.now != null ? '<span class="add">Added</span> ' + quoted(t.now) : '<span class="del">Removed</span> ' + quoted(t.was)) + '</div>').join('') +
-      (c.notes ? '<div class="pair">Notes ' + (c.notes.was && c.notes.now ? 'changed: <span class="was">' + quoted(c.notes.was) + '</span> → <span class="now">' + quoted(c.notes.now) + '</span>'
+      [[c.text, ''], [c.captions || [], 'Captions: ']].map(([lines, label]) => lines.map(t => '<div class="pair">' + label +
+        (t.was != null && t.now != null ? wasNow(t.was, t.now)
+          : t.now != null ? '<span class="add">' + (label ? 'added' : 'Added') + '</span> ' + quoted(t.now) : '<span class="del">' + (label ? 'removed' : 'Removed') + '</span> ' + quoted(t.was)) + '</div>').join('')).join('') +
+      (c.notes ? '<div class="pair">Notes ' + (c.notes.was && c.notes.now ? 'changed: ' + wasNow(c.notes.was, c.notes.now)
         : c.notes.now ? '<span class="add">added</span>: ' + quoted(c.notes.now) : '<span class="del">removed</span>') + '</div>' : '') + '</li>').join('') +
     d.added.map(s => '<li><span class="add">Added</span> ' + slide(s, v.thisIsNewer) + '</li>').join('') +
     d.removed.map(s => '<li><span class="del">Removed</span> ' + slide(s, !v.thisIsNewer) + ' <span class="what">(its number in the older version)</span></li>').join('');

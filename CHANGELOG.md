@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.1 (2026-11-05)
+
+- **Changes since an earlier version compares closed captions**, caption by caption, shown under each slide as "Captions: “old” → “new”". Each version is now kept with its captions (read from each clip's captions file, four at a time, when the version opens). Versions kept by 1.6.0 have no captions, so the panel says captions weren't compared until that version is opened again.
+- **Old and new text on separate lines:** in a change, the new text starts on its own line after the arrow, so the two are easier to compare.
+
 ## 1.6.0 (2026-11-05)
 
 - **Changes since an earlier version**, a new side panel section (starts collapsed): for a course republished to Review, the slides added, removed, moved or renamed, and the text and notes changed on each, shown as “old → new”. Pick the version to compare with; by default it's the latest one published before the version showing. Each slide in the list is a link that goes straight to it, even when the menu is restricted (through the player's `requestSlideForReview`, which Review uses for comments, or in older players the request Next makes). Slides are matched by Storyline's slide IDs. Images, media, triggers and layout aren't compared.

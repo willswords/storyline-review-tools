@@ -654,14 +654,24 @@
   // So the text of each version opened is kept (courseSnapshot), and a later version is compared with it. Slides
   // are matched by their id, which stays the same when a Storyline project is republished; the course is matched
   // by data.js "courseId" (a copy of a project made with Save As keeps it too, so the course title is shown).
-  function courseSnapshot(data, slideData, notes) {
+  // captionsOf(file) gives a captions file's text (captionsText), or null when it isn't read: then the version is kept
+  // without captions (hasCaptions false), and captions aren't compared with it.
+  function courseSnapshot(data, slideData, notes, captionsOf) {
     const slides = [];
+    let hasCaptions = !!captionsOf;
     for (const s of slideIndex(data).values()) {
       const sd = s.slide.html5url ? slideData(s.slide.html5url) : s.slide;
       const text = sd && sd.slideLayers ? slideText(sd).flatMap(l => l.texts.map(t => (l.layer === 'Base layer' ? '' : '[' + l.layer + '] ') + t)) : null;
-      slides.push({ id: s.id, number: s.number, title: s.title, text, notes: (notes && notes.bySlide[s.id]) || '' });
+      // Each caption (cue) is one line, labelled with its layer like the text
+      const captions = [];
+      for (const m of captionsOf && sd && sd.slideLayers ? slideMedia(sd, data) : []) {
+        const t = captionsOf(m.file);
+        if (t == null) { hasCaptions = false; continue; }
+        for (const line of t.split('\n')) if (line) captions.push((m.layer === 'Base layer' ? '' : '[' + m.layer + '] ') + line);
+      }
+      slides.push({ id: s.id, number: s.number, title: s.title, text, captions, notes: (notes && notes.bySlide[s.id]) || '' });
     }
-    return { courseId: data.courseId || data.projectId || '', title: slides.length ? slides[0].title : '', slides };
+    return { courseId: data.courseId || data.projectId || '', title: slides.length ? slides[0].title : '', hasCaptions, slides };
   }
   // How alike two texts are, by the words they share (0 to 1): to pair a removed text box with the one that replaced it
   const wordsOf = s => String(s).toLowerCase().match(/[a-z0-9']+/g) || [];
@@ -671,27 +681,33 @@
     const shared = wa.filter(w => wb.has(w)).length;
     return 2 * shared / (wa.length + wb.size);
   }
-  // From old to new: slides added, removed, moved or renamed, and text and notes changed on each slide
+  // Lines only in one version ([{ was, now }]); a removed line much like an added one is shown as changed
+  function changedLines(was, now) {
+    const out = [];
+    const removed = was.filter(t => !now.includes(t)), added = now.filter(t => !was.includes(t));
+    for (const r of removed) {
+      let best = -1, score = 0.5;
+      added.forEach((a, i) => { const x = alike(r, a); if (x > score) { score = x; best = i; } });
+      out.push({ was: r, now: best >= 0 ? added.splice(best, 1)[0] : null });
+    }
+    for (const a of added) out.push({ was: null, now: a });
+    return out;
+  }
+  // From old to new: slides added, removed, moved or renamed, and text, closed captions and notes changed on each
+  // slide. Captions are compared only when both versions were kept with them (versions kept before 1.6.0 weren't).
   function compareSnapshots(old, now) {
     const before = new Map(old.slides.map(s => [s.id, s]));
     const after = new Map(now.slides.map(s => [s.id, s]));
-    const out = { added: [], removed: [], changed: [], unchanged: 0, notChecked: 0 };
+    const withCaptions = !!(old.hasCaptions && now.hasCaptions);
+    const out = { added: [], removed: [], changed: [], unchanged: 0, notChecked: 0, captionsCompared: withCaptions };
     for (const s of now.slides) {
       const o = before.get(s.id);
       if (!o) { out.added.push({ id: s.id, number: s.number, title: s.title }); continue; }
       if (!s.text || !o.text) { out.notChecked++; continue; }
-      const change = { id: s.id, number: s.number, title: s.title, moved: o.number !== s.number ? o.number : '', renamed: o.title !== s.title ? o.title : '', text: [], notes: null };
-      // Text boxes only in one version; a removed one much like an added one is shown as changed
-      const removed = o.text.filter(t => !s.text.includes(t)), added = s.text.filter(t => !o.text.includes(t));
-      for (const r of removed) {
-        let best = -1, score = 0.5;
-        added.forEach((a, i) => { const x = alike(r, a); if (x > score) { score = x; best = i; } });
-        if (best >= 0) change.text.push({ was: r, now: added.splice(best, 1)[0] });
-        else change.text.push({ was: r, now: null });
-      }
-      for (const a of added) change.text.push({ was: null, now: a });
+      const change = { id: s.id, number: s.number, title: s.title, moved: o.number !== s.number ? o.number : '', renamed: o.title !== s.title ? o.title : '',
+        text: changedLines(o.text, s.text), captions: withCaptions ? changedLines(o.captions || [], s.captions || []) : [], notes: null };
       if (o.notes !== s.notes) change.notes = { was: o.notes, now: s.notes };
-      if (change.moved || change.renamed || change.text.length || change.notes) out.changed.push(change); else out.unchanged++;
+      if (change.moved || change.renamed || change.text.length || change.captions.length || change.notes) out.changed.push(change); else out.unchanged++;
     }
     for (const o of old.slides) if (!after.has(o.id)) out.removed.push({ id: o.id, number: o.number, title: o.title });
     return out;

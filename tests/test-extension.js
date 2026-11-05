@@ -93,7 +93,8 @@ const EXT = path.join(__dirname, '..');
       saveScreenshot('side-panel-this-slide.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: area.y, width: 400, height: Math.min(area.h, 700), scale: 1 } }, panel)).result.data);
     }
     // Changes since an earlier version: a fresh browser has opened no earlier version, so it says how to
-    check('Changes since an earlier version starts collapsed, and says how to compare', await P(`!document.getElementById('versSec').hidden && document.getElementById('versSec').classList.contains('collapsed') && !document.getElementById('versNone').hidden`));
+    // (it appears once the version is kept, after its closed captions are read)
+    check('Changes since an earlier version starts collapsed, and says how to compare', !!(await waitP(`!document.getElementById('versSec').hidden && document.getElementById('versSec').classList.contains('collapsed') && !document.getElementById('versNone').hidden`, 30000)));
     await P(`document.getElementById('btnCloseText').click(); 1`);
     check('Close hides the text box', await P(`document.getElementById('slideTextBox').hidden`));
 

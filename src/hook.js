@@ -193,17 +193,20 @@
 
   // The closed captions of the slide's audio and video, from their captions files (each read once); captions is
   // [] while they're loading, then [{ layer, name, text }] (the watch above sends them on its next tick)
+  // (A captions file's text, or null if it couldn't be read; each file is read once.)
   const captionFiles = new Map();
+  function captionsFile(file) {
+    if (!captionFiles.has(file)) captionFiles.set(file, fetch(new URL(file, location.href), { credentials: 'same-origin' })
+      .then(r => r.ok ? r.text() : null).then(t => t == null ? null : core.captionsText(t)).catch(() => null));
+    return captionFiles.get(file);
+  }
   function loadCaptions(slide, into) {
     const media = core.slideMedia(slide, data);
     if (!media.length) return;
     into.captions = [];
     into.captionsLoading = true;
-    Promise.all(media.map(m => {
-      if (!captionFiles.has(m.file)) captionFiles.set(m.file, fetch(new URL(m.file, location.href), { credentials: 'same-origin' })
-        .then(r => r.ok ? r.text() : '').then(core.captionsText).catch(() => ''));
-      return captionFiles.get(m.file).then(text => text ? { layer: m.layer, name: m.name, text } : null);
-    })).then(list => { into.captions = list.filter(Boolean); into.captionsLoading = false; });
+    Promise.all(media.map(m => captionsFile(m.file).then(text => text ? { layer: m.layer, name: m.name, text } : null)))
+      .then(list => { into.captions = list.filter(Boolean); into.captionsLoading = false; });
   }
 
   // A message over the course when the status changes, like the SCORM Test LMS's. In its own shadow DOM, so the
@@ -289,7 +292,7 @@
     updateLocks(true);
     updateQuiz();
     updateCompletion();
-    try { saveVersion(); } catch (e) { fail('versions', e); }
+    saveVersion().catch(e => fail('versions', e));
     sendState();
   }
 
@@ -303,10 +306,20 @@
   function storedVersions() {
     try { const v = JSON.parse(localStorage.getItem(VERSIONS_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }
   }
-  function saveVersion() {
+  async function saveVersion() {
     if (!data || !thisFolder) return;
+    // The closed captions of every slide's audio and video, read four files at a time
+    const slideData = f => slideCache.get(f) || null;
+    const files = [...new Set([...core.slideIndex(data).values()].flatMap(s => {
+      const sd = s.slide.html5url ? slideData(s.slide.html5url) : s.slide;
+      return sd && sd.slideLayers ? core.slideMedia(sd, data).map(m => m.file) : [];
+    }))];
+    const captions = new Map();
+    for (let i = 0; i < files.length; i += 4) {
+      await Promise.all(files.slice(i, i + 4).map(f => captionsFile(f).then(t => captions.set(f, t))));
+    }
     const g = window.globals || {};
-    snapshot = Object.assign(core.courseSnapshot(data, f => slideCache.get(f) || null, notes), {
+    snapshot = Object.assign(core.courseSnapshot(data, slideData, notes, f => captions.has(f) ? captions.get(f) : null), {
       folder: thisFolder, title: document.title || '', published: g.publishTimestamp || '', savedAt: new Date().toISOString()
     });
     // Newest first; the oldest go when there are too many, or they'd take too much room
@@ -317,6 +330,7 @@
       all = all.slice(0, -1);
     }
     compareVersions();
+    sendState();
   }
   // Compare with the chosen version (by default the latest one published before this one), from older to newer
   function compareVersions() {

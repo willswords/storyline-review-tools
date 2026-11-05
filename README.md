@@ -95,14 +95,15 @@ Compare with  [Published 10/31/2026 at 8:08 PM · 3 slides ▾]
 From that version to this one: 1 changed, 1 added, 2 removed slides.
   • Slide 1.1 "Go to the next slide to finish the course."
       renamed from "Answer the question correctly to complete the course."
-      "Answer the question correctly…" → "Go to the next slide…"
+      "Answer the question correctly…" →
+      "Go to the next slide…"
   • Added Slide 1.2 "You have finished the course…"
   • Removed Slide 1.3 "Quiz Results"
 ```
 
 Each slide in the list is a link: click it to go straight to that slide, even if the course's menu is restricted (as Review does when you click a comment). A slide that's only in the other version, such as one removed since, isn't a link.
 
-It compares slide titles, text (on every layer), notes and slide order. Slides are matched between versions by Storyline's own slide IDs, so a slide that moved or was renamed is still the same slide. Images, media, triggers and layout aren't compared.
+It compares slide titles, text (on every layer), the closed captions of the slide's audio and video (caption by caption, listed as "Captions:"), notes and slide order. Versions remembered by an earlier version of the extension have no captions, so captions aren't compared with them until they're opened again. Slides are matched between versions by Storyline's own slide IDs, so a slide that moved or was renamed is still the same slide. Images, media, triggers and layout aren't compared.
 
 Review doesn't let the extension see its list of versions, so the extension remembers each version **when you open it**: it keeps a copy of the version's text in your browser (the most recent 30 versions), and nothing is sent anywhere. So:
 

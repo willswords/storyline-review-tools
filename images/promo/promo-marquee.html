@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Storyline Review Tools: marquee promo tile (1400×560)</title>
+<style>
+  html, body { margin: 0; }
+  body { width: 1400px; height: 560px; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+  .marquee {
+    position: relative; width: 1400px; height: 560px; box-sizing: border-box; padding: 64px 72px;
+    background: radial-gradient(110% 150% at 0% 0%, #2f74e6 0%, #1d5fd1 40%, #113a8f 100%);
+    color: #fff; display: grid; grid-template-columns: 1fr 470px; gap: 64px; align-items: center; overflow: hidden;
+  }
+  .marquee::before {
+    content: ''; position: absolute; left: -120px; bottom: -220px; width: 520px; height: 520px; border-radius: 50%;
+    border: 60px solid rgba(255,255,255,.05);
+  }
+  .left { position: relative; z-index: 1; }
+  .brand { display: flex; align-items: center; gap: 24px; }
+  .icon { width: 112px; height: 112px; border-radius: 26px; box-shadow: 0 10px 28px rgba(0,0,0,.3), 0 0 0 4px rgba(255,255,255,.9); }
+  h1 { margin: 0; font-size: 56px; line-height: 1; font-weight: 700; letter-spacing: -.8px; }
+  .sub { font-size: 16px; letter-spacing: .16em; text-transform: uppercase; opacity: .82; margin-top: 10px; font-weight: 600; }
+  .tag { margin: 36px 0 30px; font-size: 30px; line-height: 1.3; font-weight: 600; max-width: 680px; }
+  .tag b { color: #ffd166; }
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; max-width: 720px; }
+  .chip { font-size: 17px; font-weight: 600; padding: 8px 16px; border-radius: 999px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); }
+
+  /* A drawn impression of the side panel (not a screenshot) */
+  .panel {
+    position: relative; z-index: 1; background: #fff; color: #1b2030; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0,0,0,.35); transform: rotate(-1.5deg); font-size: 15px;
+  }
+  .panel header { background: #f3f4f7; padding: 14px 20px; border-bottom: 1px solid #d5d9e2; font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 10px; }
+  .panel header img { width: 26px; height: 26px; border-radius: 6px; }
+  .sec { padding: 14px 20px; border-bottom: 1px solid #e3e6ec; }
+  .sec:last-child { border-bottom: 0; }
+  .h { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: #5d6577; font-weight: 700; margin-bottom: 8px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .badge { border-radius: 999px; padding: 1px 10px; font-size: 12.5px; font-weight: 700; color: #fff; }
+  .ok { background: #137a43; } .warn { background: #9a5b00; }
+  .muted { color: #5d6577; font-size: 13.5px; }
+  .was { color: #b42318; text-decoration: line-through; }
+  .now { color: #137a43; }
+  .ins { background: rgba(19,122,67,.18); color: #1b2030; font-weight: 700; border-radius: 3px; padding: 0 3px; }
+  .link { color: #1d5fd1; font-weight: 600; }
+  .here { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #fff; background: #1d5fd1; border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+</style>
+</head>
+<body>
+  <div class="marquee">
+    <div class="left">
+      <div class="brand">
+        <img class="icon" src="../../icons/icon128.png" alt="">
+        <div><h1>Storyline Review Tools</h1><div class="sub">For Articulate Review · Chrome &amp; Edge</div></div>
+      </div>
+      <div class="tag">Review Storyline courses <b>faster</b>, and check they’ll <b>complete</b> in your LMS.</div>
+      <div class="chips">
+        <span class="chip">Unlock navigation</span>
+        <span class="chip">Why can’t I move on?</span>
+        <span class="chip">Copy slide text</span>
+        <span class="chip">Compare versions</span>
+        <span class="chip">Completion check</span>
+        <span class="chip">Quiz answers</span>
+      </div>
+    </div>
+
+    <div class="panel" aria-hidden="true">
+      <header><img src="../../icons/icon128.png" alt="">Storyline Review Tools</header>
+      <div class="sec">
+        <div class="h">This slide</div>
+        <div class="row"><b>Next</b> <span class="badge warn">Greyed out</span></div>
+        <div class="muted">Disabled until the timeline ends (0:45).</div>
+      </div>
+      <div class="sec">
+        <div class="h">Changes since an earlier version</div>
+        <div class="row"><span class="link">Slide 2.3 “Getting Started”</span><span class="here">You’re here</span></div>
+        <div class="muted"><span class="was">“…review the guide before you begin.”</span> →</div>
+        <div class="now">“…review the <span class="ins">quick-start</span> guide before you begin.”</div>
+      </div>
+      <div class="sec">
+        <div class="h">Completion</div>
+        <div class="row"><span class="badge ok">✓ Passed</span> <span class="muted">Quiz result on slide 6.4 · score 100%</span></div>
+        <div class="muted">About 24 min estimated seat time</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

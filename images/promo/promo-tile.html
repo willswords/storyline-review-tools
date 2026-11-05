@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Storyline Review Tools: small promo tile (440×280)</title>
+<style>
+  html, body { margin: 0; }
+  body { width: 440px; height: 280px; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+  .tile {
+    position: relative; width: 440px; height: 280px; box-sizing: border-box; padding: 34px 34px 30px;
+    background: radial-gradient(120% 140% at 0% 0%, #2f74e6 0%, #1d5fd1 38%, #123f99 100%);
+    color: #fff; display: flex; flex-direction: column; justify-content: space-between;
+  }
+  /* A soft ring behind the icon, and faint panel lines on the right, for depth */
+  .tile::after {
+    content: ''; position: absolute; right: -60px; top: -60px; width: 260px; height: 260px; border-radius: 50%;
+    border: 34px solid rgba(255,255,255,.06);
+  }
+  .top { display: flex; align-items: center; gap: 16px; position: relative; z-index: 1; }
+  .icon { width: 76px; height: 76px; border-radius: 18px; box-shadow: 0 6px 18px rgba(0,0,0,.28), 0 0 0 3px rgba(255,255,255,.9); }
+  h1 { margin: 0; font-size: 31px; line-height: 1.05; font-weight: 700; letter-spacing: -.3px; }
+  .sub { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; opacity: .8; margin-top: 4px; font-weight: 600; }
+  .tag { position: relative; z-index: 1; font-size: 19px; line-height: 1.3; font-weight: 600; max-width: 360px; }
+  .tag b { color: #ffd166; font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="tile">
+    <div class="top">
+      <img class="icon" src="../../icons/icon128.png" alt="">
+      <div><h1>Storyline<br>Review Tools</h1><div class="sub">For Articulate Review</div></div>
+    </div>
+    <div class="tag">Review Storyline courses <b>faster</b>, and check they’ll <b>complete</b> in your LMS.</div>
+  </div>
+</body>
+</html>

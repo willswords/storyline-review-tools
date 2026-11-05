@@ -26,6 +26,8 @@
     changed: { frame: 0, nav: 0, seek: 0, answers: 0, slides: 0 },
     // How the course completes (core.completionInfo), and what it has reported in this session
     completion: { info: null, watching: null, status: null, score: null, history: [] },
+    // The slide showing now: what it does to Next and Prev (core.explainSlide), their state on screen, variable values
+    current: null,
     errors: []
   };
   const startedAt = Date.now();
@@ -60,7 +62,9 @@
     if (data) state.quiz = core.buildQuizKey(data, f => slideCache.get(f) || null);
   }
   function updateCompletion() {
-    if (data) state.completion.info = core.completionInfo(data, f => slideCache.get(f) || null);
+    if (!data) return;
+    state.completion.info = core.completionInfo(data, f => slideCache.get(f) || null);
+    state.completion.seat = core.seatTime(data, f => slideCache.get(f) || null);
   }
 
   // ── Completion: what the course would report to an LMS ──
@@ -75,6 +79,7 @@
       if (DS && DS.pubSub && typeof DS.pubSub.on === 'function' && DS.events && DS.presentation && typeof DS.presentation.scorings === 'function') {
         clearInterval(timer);
         try { listenForStatus(DS); } catch (e) { state.completion.watching = false; fail('completion', e); }
+        watchSlide(DS);
       } else if (++tries > 1200) { clearInterval(timer); state.completion.watching = false; sendState(); }   // 2 minutes: a player this doesn't know
     }, 100);
   }
@@ -144,6 +149,41 @@
     // Already met before this started listening (such as a course resumed where it was complete)
     if (scorings().getStatus() !== 'incomplete') reportStatus();
     sendState();
+  }
+
+  // ── This slide: "why can't I move on?" ──
+  // Twice a second: which slide is showing, and whether its Next and Prev are on screen and enabled. The slide's
+  // triggers are explained once per slide, from its file as published (so what the settings change still shows).
+  function watchSlide(DS) {
+    let explainedFor = null, explained = null, last = '';
+    const button = id => {
+      const el = document.getElementById(id);
+      if (!el) return { shown: false, enabled: false };
+      const r = el.getBoundingClientRect(), st = getComputedStyle(el);
+      const shown = !!r.width && st.display !== 'none' && st.visibility !== 'hidden' && st.opacity !== '0';
+      return { shown, enabled: shown && !el.classList.contains('cs-disabled') && el.getAttribute('aria-disabled') !== 'true' };
+    };
+    setInterval(() => {
+      try {
+        const s = DS.windowManager.getCurrentWindow().getCurrentSlide();
+        const id = s && String(s.absoluteId || '').split('.').pop();
+        if (!id || !data) return;
+        if (id !== explainedFor) {
+          const file = fileOfSlide.get(id);
+          let slide = file ? slideCache.get(file) : null;
+          if (!slide && !file) for (const sc of data.scenes || []) for (const x of sc.slides || []) if (x.id === id && x.slideLayers) slide = x;
+          if (!slide) return;   // not read yet: tried again on the next tick
+          explained = core.explainSlide(slide, data, state.frame);
+          explainedFor = id;
+        }
+        const player = window.GetPlayer && window.GetPlayer();
+        const values = {};
+        for (const v of explained.vars) { try { values[v] = player.GetVar(v); } catch (e) {} }
+        const cur = Object.assign({}, explained, { live: { next: button('next'), prev: button('prev') }, values });
+        const json = JSON.stringify(cur);
+        if (json !== last) { last = json; state.current = cur; sendState(); }
+      } catch (e) { /* the player is between slides */ }
+    }, 500);
   }
 
   // A message over the course when the status changes, like the SCORM Test LMS's. In its own shadow DOM, so the

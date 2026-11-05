@@ -10,7 +10,7 @@ A Chrome and Edge extension for reviewing Articulate Storyline courses on **Arti
 | **Add Next/Prev buttons where turned off** | Shows Next and Prev on slides whose Player features (slide properties) leave them out, including question slides, where Next appears beside Submit. Next goes to the next slide in the menu, Prev goes back. |
 | **Pre-select correct quiz answers** | Opens question slides with the correct answer already filled in, so you only press Submit. |
 
-The side panel also lists the course's **quiz answers**, as the course scores them, and shows **when the course completes**: what its tracking needs, and the status it reports as you play it (see [Completion](#completion)).
+The side panel also explains **why you can or can't move on from the slide you're on** (see [This slide](#this-slide)), lists the course's **quiz answers**, as the course scores them, and shows **when the course completes**: what its tracking needs, and the status it reports as you play it (see [Completion](#completion)).
 
 Nothing is changed on Review. The extension changes what your own browser loads as the course starts, and only while an option is on. Other reviewers, and the published course, aren't affected.
 
@@ -37,7 +37,7 @@ The panel shows what the course in the current tab does, and what's being change
 Free navigation (menu)
   Menu navigation is "restricted" → opened as "free".
 Unlock Next/Prev buttons
-  63 trigger(s) in 21 slide(s) disable Next/Prev → kept enabled.
+  42 trigger(s) in 21 slide(s) disable Next/Prev → kept enabled.
 Add Next/Prev buttons where turned off
   42 slide(s) turn off Next/Prev in their Player features → added; Next goes to the next slide, Prev goes back.
 Pre-select correct quiz answers
@@ -46,7 +46,7 @@ Pre-select correct quiz answers
 
 An option is greyed out when the course has nothing for it to unlock.
 
-**Unlock all navigation** turns on (or off) all four navigation options at once, skipping any that are greyed out, and reloads the course once. It shows a dash when only some of them are on; clicking it then turns them all on.
+**Unlock all navigation** turns on (or off) the three unlocking options (free navigation, seekbar, Next/Prev) at once, skipping any that are greyed out, and reloads the course once. It shows a dash when only some of them are on; clicking it then turns them all on.
 
 The options apply to **every Review course you open** until you turn them off. While any is on, the toolbar button shows **ON**. Turn them off before reviewing a course as a learner would see it.
 
@@ -60,6 +60,29 @@ The options apply to **every Review course you open** until you turn them off. W
 - **Hotspot:** a click is recorded in the centre of the correct area.
 
 Other question types (drag and drop, matching, sequence, word bank and so on) are answered by hand. The **Quiz answers** list in the panel shows their correct answers.
+
+### This slide
+
+When you're stuck on a slide, **This slide** in the panel says why. It starts collapsed: click its heading to open it (the panel remembers whether it's open). It follows the slide you're on and shows, for Next and for Prev:
+
+- whether the button is **available**, **greyed out** or **not showing** right now;
+- whether it's turned off in the slide's Player features;
+- each trigger that disables, enables, hides or shows it, when it runs and what it waits for, in Storyline's words;
+- where it goes.
+
+It also lists the slide's own buttons that go to other slides, and the current values of any variables the triggers check. For example:
+
+```
+Slide 1.6 "What Should I Do?"
+Next  [Not showing]
+  • Hidden when the timeline starts, if "Tab A" is in its Normal state and "Tab B" is in its Normal state.
+  • Disabled as the slide appears, if the timeline hasn't played to the end yet.
+  • Shown and enabled when "Tab A" is visited or when "Tab B" is visited, if "Tab A" is visited and "Tab B" is visited.
+  • Goes to slide 1.9 "Service Recovery".
+  No option overrides a trigger that hides it; Free navigation (menu) lets you jump on from the menu.
+```
+
+When the button isn't available, it says which option gets past it: **Unlock Next/Prev buttons** for a disabled button, **Add Next/Prev buttons where turned off** for one turned off in Player features. Storyline's own trigger that disables Prev on the first slide you open isn't counted as a lock.
 
 ### Completion
 
@@ -99,6 +122,17 @@ A failed quiz shows **Marked failed** in red. Retrying the quiz sets the status 
 The status comes from the Storyline player itself: on Review it works out the course's status just as it does in an LMS, but has no LMS to send it to. The extension follows the player's own status events and applies the same rules as the player's SCORM code, so it shows the moments a published course would report, and what it would send. Nothing is sent anywhere. Reloading the course starts again.
 
 The words "Passed", "Completed", "Failed" and "Incomplete" come from the course's **Reporting** setting as published to Review. Check it's the same under **Publish › LMS › Reporting and Tracking** when you publish for an LMS.
+
+#### Estimated seat time
+
+The Completion section also estimates how long the course takes, for LMS catalogue entries, for example "About 12 min (up to 17 min if every layer is opened)". Storyline doesn't record a seat time, so it's worked out from the slides:
+
+- each slide's timeline, which runs as long as its narration and video;
+- at least the time to read a slide's text (at 200 words a minute), for slides whose timeline is shorter;
+- layers (feedback, tabs, pop-ups) as "up to", since a learner opens only some of them;
+- question bank draws, at the average length of the bank's slides.
+
+Time spent answering questions isn't included (the panel says how many there are), and it assumes every slide is viewed once. **How it's worked out**, below the estimate, shows each part.
 
 ## How it works
 

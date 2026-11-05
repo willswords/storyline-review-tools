@@ -111,9 +111,13 @@
   // Only disabling triggers are changed; showing/hiding and click actions are left alone.
   const NAV_CONTROLS = ['next', 'prev', 'previous', 'swiperight', 'swipeleft'];
   const isLock = (o, names) => o.kind === 'enable_window_control' && names.includes(o.name) && o.enable === false;
+  // (Storyline's own "no Prev on the first slide of a session" trigger isn't counted: see isAutoPrev below)
   function countLocks(slide) {
     const out = { nav: 0, seek: 0 };
-    walk(slide, o => { if (isLock(o, NAV_CONTROLS)) out.nav++; if (isLock(o, ['seekbar'])) out.seek++; });
+    for (const f of findActions(slide, ['enable_window_control'])) {
+      if (isLock(f.action, NAV_CONTROLS) && !isAutoPrev(f)) out.nav++;
+      if (isLock(f.action, ['seekbar'])) out.seek++;
+    }
     return out;
   }
   function changeSlideLocks(slide, settings) {
@@ -353,22 +357,47 @@
   // The slide id in a player path such as "_player.<scene>.<slide>"
   const slideOf = (index, path) => index.get(String(path || '').split('.').pop()) || null;
 
+  // An object's name for a reviewer: the text it shows (a button's label, also inside a button group), else its alt
+  // text, else what kind of object it is, else its id
+  const KIND_WORDS = { video: 'the video', audio: 'the audio', webobject: 'the web object', slider: 'the slider', dial: 'the dial', textinput: 'the text box' };
+  function nameOfObject(obj) {
+    if (!obj) return '';
+    let text = '', alt = '';
+    (function find(o) {
+      if (text || !o || typeof o !== 'object') return;
+      for (const t of Array.isArray(o.textLib) ? o.textLib : []) {
+        const s = ((t && t.vartext && t.vartext.blocks) || []).map(b => (b.spans || []).map(sp => sp.text).join('')).join(' ').replace(/\s+/g, ' ').trim();
+        if (s && !text) text = s;
+      }
+      const d = o.data;
+      if (!alt) alt = plain((d && d.textdata && d.textdata.altText) || (d && d.vectorData && d.vectorData.altText) || o.accText);
+      for (const k in o) if (k !== 'textLib' && k !== 'events' && k !== 'actionGroups') find(o[k]);
+    })(obj);
+    if (text && text.length <= 60) return text;
+    return alt || (text ? text.slice(0, 57) + '…' : '') || KIND_WORDS[obj.kind] || obj.id;
+  }
   // When a trigger runs, in Storyline's words
-  function describeWhen(ctx) {
-    const obj = ctx.object, d = obj && obj.data;
-    const name = obj && (plain((d && d.textdata && d.textdata.altText) || (d && d.vectorData && d.vectorData.altText) || obj.accText) || obj.id);
+  function describeWhen(ctx, nameOf) {
+    const name = ctx.object ? (nameOf ? nameOf(ctx.object.id) : nameOfObject(ctx.object)) : '';
+    const v = ctx.varname ? String(ctx.varname) : '';
     const on = {
       onslidestart: 'when the timeline starts', ontimelinestart: 'when the timeline starts', ontransitionin: 'as the slide appears',
       ontimelinecomplete: 'when the timeline ends', ontimelineend: 'when the timeline ends', onsubmitslide: 'when Submit is pressed',
       onnextslide: 'when Next is pressed', onprevslide: 'when Prev is pressed', onrelease: name ? 'when “' + name + '” is clicked' : 'when an object is clicked',
-      onclick: name ? 'when “' + name + '” is clicked' : 'when an object is clicked'
+      onclick: name ? 'when “' + name + '” is clicked' : 'when an object is clicked',
+      onmediacomplete: name ? 'when “' + name + '” finishes playing' : 'when the media finishes playing',
+      onvarchanged: v === '_visited' ? (name ? 'when “' + name + '” is visited' : 'when an object is visited')
+        : v === '_state' ? (name ? 'when “' + name + '” changes state' : 'when an object changes state')
+        : v ? 'when variable ' + v.replace(/^_player\./, '') + ' changes' : ''
     }[ctx.event];
     let when = on || (ctx.event === 'ontimelinetick' ? 'at ' + Math.round((ctx.time || 0) / 100) / 10 + ' s on the timeline' : ctx.event ? 'on “' + ctx.event + '”' : 'from a trigger group');
     if (ctx.layer) when += ' (on a layer)';
     if (ctx.conditional) when += ', if its conditions are met';
     return when;
   }
-  // Every action of the given kinds in a slide (or other JSON), with the trigger it belongs to
+  // Every action of the given kinds in a slide (or other JSON), with the trigger it belongs to: the event, the object
+  // whose trigger it is, whether it's on a layer, the conditions it waits for (conditions: [{ statement, not }],
+  // "not" for an Else branch), and the trigger group it's in (group, groupOwner).
   function findActions(rootObj, kinds) {
     const out = [];
     (function visit(o, ctx) {
@@ -376,12 +405,215 @@
       if (!o || typeof o !== 'object') return;
       let c = ctx;
       if (o.kind === 'slidelayer') c = Object.assign({}, c, { layer: !o.isBaseLayer });
-      else if (typeof o.kind === 'string' && /^on/.test(o.kind)) c = Object.assign({}, c, { event: o.kind, time: o.time });
-      else if (o.kind === 'if_action') c = Object.assign({}, c, { conditional: true });
+      else if (typeof o.kind === 'string' && /^on/.test(o.kind)) c = Object.assign({}, c, { event: o.kind, time: o.time, varname: o.varname });
       else if (o !== rootObj && Array.isArray(o.events) && o.id) c = Object.assign({}, c, { object: o });
       if (kinds.includes(o.kind)) out.push(Object.assign({ action: o }, c));
-      for (const k in o) if (o[k] && typeof o[k] === 'object') visit(o[k], c);
+      if (o.kind === 'if_action') {
+        // The condition goes with the actions it decides
+        const st = o.condition && o.condition.statement, conds = c.conditions || [];
+        visit(o.thenActions, Object.assign({}, c, { conditional: true, conditions: conds.concat({ statement: st }) }));
+        visit(o.elseActions, Object.assign({}, c, { conditional: true, conditions: conds.concat({ statement: st, not: true }) }));
+        return;
+      }
+      for (const k in o) {
+        const v = o[k];
+        if (k === 'actionGroups' && v && typeof v === 'object' && !Array.isArray(v)) {
+          for (const g in v) visit(v[g], Object.assign({}, c, { event: undefined, time: undefined, varname: undefined, group: g, groupOwner: o }));
+        } else if (v && typeof v === 'object') visit(v, c);
+      }
     })(rootObj, {});
+    return out;
+  }
+
+  // ── 5. "Why can't I move on?": what a slide does to the player's Next and Prev ──
+  // A slide can (1) turn a button off in its Player features (see controlLayouts above), (2) disable or enable it
+  // with triggers ({"kind":"enable_window_control","name":"next","enable":false}), (3) hide or show it with triggers
+  // ({"kind":"set_window_control_visible","name":"next","visible":false}), and (4) give Next somewhere to go
+  // (its "onnextslide" trigger) or move on through its own buttons. Storyline adds one trigger to every slide by
+  // itself: Prev is disabled on the first slide of a session ("_playerVars.#hasPrevHistory" is false).
+  const NAV_NAMES = { next: ['next'], prev: ['previous', 'prev'] };
+  const isAutoPrev = f => f.action.name !== 'next' && (f.conditions || []).some(c => c.statement && JSON.stringify(c.statement).includes('#hasPrevHistory'));
+  const STATE_WORDS = { _default: 'Normal', _normal: 'Normal', _disabled: 'Disabled', _visited: 'Visited', _selected: 'Selected', _hover: 'Hover', _down: 'Down', _hidden: 'Hidden' };
+  const OPS = { eq: 'is', noteq: 'is not', gt: '>', gte: '≥', lt: '<', lte: '≤' };
+  const shown = v => typeof v === 'boolean' ? (v ? 'True' : 'False') : typeof v === 'string' ? '“' + v + '”' : String(v);
+
+  // A trigger condition in words. Course variables it reads are added to vars (for their live values).
+  function describeStatement(st, nameOf, vars) {
+    if (!st || typeof st !== 'object') return '';
+    if (st.kind === 'and' || st.kind === 'or') {
+      const parts = (st.statements || []).map(p => describeStatement(p, nameOf, vars)).filter(Boolean);
+      return parts.join(st.kind === 'and' ? ' and ' : ' or ');
+    }
+    if (st.kind !== 'compare') return '';
+    const a = String(st.valuea || ''), b = st.valueb, yes = (b === true) === (st.operator === 'eq');
+    let m;
+    if (/#TimelineCompleted_/.test(a)) return yes ? 'the timeline has played to the end' : 'the timeline hasn’t played to the end yet';
+    if (/#hasPrevHistory$/.test(a)) return yes ? 'there’s a slide to go back to' : 'there’s no slide to go back to';
+    if (/#ReviewMode_/.test(a)) return yes ? 'the quiz is being reviewed' : 'the quiz isn’t being reviewed';
+    if (/#RetryMode_/.test(a)) return yes ? 'the quiz is being retried' : 'the quiz isn’t being retried';
+    if ((m = /(\w+)\.#_visited$/.exec(a))) return '“' + nameOf(m[1]) + '” ' + (yes ? 'is visited' : 'isn’t visited');
+    if ((m = /(\w+)\.#_state$/.exec(a))) return '“' + nameOf(m[1]) + '” ' + (st.operator === 'noteq' ? 'isn’t' : 'is') + ' in its ' + (STATE_WORDS[b] || shown(b)) + ' state';
+    if ((m = /(\w+)\.#_checked$/.exec(a))) return '“' + nameOf(m[1]) + '” ' + (yes ? 'is selected' : 'isn’t selected');
+    if ((m = /^(?:_player\.)?([A-Za-z]\w*)$/.exec(a)) && st.typea === 'var') { vars.add(m[1]); return 'variable ' + m[1] + ' ' + (OPS[st.operator] || st.operator) + ' ' + shown(b); }
+    return a.replace(/^_player\./, '') + ' ' + (OPS[st.operator] || st.operator) + ' ' + shown(b);
+  }
+
+  // What the slide does to Next and Prev, and the slides it can go to. data for slide numbers, info from frameInfo.
+  function explainSlide(slide, data, info) {
+    const index = slideIndex(data);
+    // Objects are written as tokens, then named at the end: two objects with the same name are numbered (“Tab” #1, #2)
+    const ids = [], nameOf = id => { if (!ids.includes(id)) ids.push(id); return '\u0001' + id + '\u0001'; };
+    const vars = new Set();
+    const conds = list => (list || []).map(c => { const t = describeStatement(c.statement, nameOf, vars); return t ? (c.not ? 'unless ' + t : t) : ''; }).filter(Boolean).join(', ');
+    const target = ref => {
+      const s = slideOf(index, ref);
+      return s ? 'slide ' + s.number + (s.title ? ' “' + s.title + '”' : '') : 'another part of the course';
+    };
+    // When a trigger runs ({ when, cond }); for one in a trigger group, the triggers that run the group (up to 3 groups deep)
+    const callers = findActions(slide, ['exe_actiongroup']);
+    const both = (a, b) => [a, b].filter(Boolean).join(' and ');
+    function whens(f, depth) {
+      const own = conds(f.conditions);
+      if (!f.group) return [{ when: describeWhen(Object.assign({}, f, { conditional: false }), nameOf), cond: own }];
+      if (depth > 2) return [{ when: 'from a trigger group', cond: own }];
+      const by = callers.filter(x => String(x.action.id || '').split('.').pop() === f.group && (f.groupOwner === slide || x.object === f.groupOwner));
+      const out = by.flatMap(x => whens(x, depth + 1)).map(w => ({ when: w.when, cond: both(w.cond, own) }));
+      return out.length ? out : [{ when: 'from a trigger group', cond: own }];
+    }
+    const names = slideLayouts(slide), turnedOff = list => names.some(l => (list || []).includes(l));
+    const actions = findActions(slide, ['enable_window_control', 'set_window_control_visible']);
+    const ORDER = ['Hidden', 'Disabled', 'Shown', 'Enabled'];
+    const buttons = {};
+    for (const [btn, ids] of Object.entries(NAV_NAMES)) {
+      const mine = actions.filter(f => ids.includes(f.action.name));
+      // One entry per trigger moment: what it does to the button ("Shown and Enabled" by the same trigger read as one)
+      const moments = [];
+      for (const f of mine) {
+        if (isAutoPrev(f)) continue;
+        const effect = f.action.kind === 'set_window_control_visible' ? (f.action.visible === false ? 'Hidden' : 'Shown') : (f.action.enable === false ? 'Disabled' : 'Enabled');
+        for (const w of whens(f, 0)) {
+          const m = moments.find(x => x.when === w.when && x.cond === w.cond);
+          if (m) { if (!m.effects.includes(effect)) m.effects.push(effect); } else moments.push(Object.assign({ effects: [effect] }, w));
+        }
+      }
+      // The same change under the same conditions, at several moments, reads as one line ("when “A” is visited or when “B” is visited")
+      const lines = [];
+      for (const m of moments) {
+        const e = m.effects, effect = e.includes('Hidden') ? 'hide' : e.includes('Disabled') ? 'disable' : 'enable';
+        const words = e.includes('Hidden') ? 'Hidden' : e.includes('Disabled') ? (e.includes('Shown') ? 'Shown but disabled' : 'Disabled')
+          : e.includes('Shown') && e.includes('Enabled') ? 'Shown and enabled' : e.includes('Shown') ? 'Shown' : 'Enabled';
+        const l = lines.find(x => x.words === words && x.cond === m.cond);
+        if (l) { if (!l.whens.includes(m.when)) l.whens.push(m.when); } else lines.push({ effect, words, cond: m.cond, whens: [m.when] });
+      }
+      const rank = { hide: 0, disable: 1, enable: 2 };
+      lines.sort((a, b) => rank[a.effect] - rank[b.effect]);
+      buttons[btn] = {
+        off: turnedOff(btn === 'next' ? info && info.hidesNext : info && info.hidesPrev),
+        autoPrev: btn === 'prev' && mine.some(isAutoPrev),
+        triggers: lines.map(l => ({ effect: l.effect, text: l.words + ' ' + l.whens.join(' or ') + (l.cond ? ', if ' + l.cond : '') + '.' }))
+      };
+    }
+    // Where Next and Prev go: the slide's "when Next/Prev is pressed" triggers, through their trigger groups
+    const groups = slide.actionGroups || {};
+    function destinations(actions, depth) {
+      const out = [];
+      for (const a of actions || []) {
+        if (!a || typeof a !== 'object') continue;
+        if (a.kind === 'gotoplay' && a.objRef) out.push(target(a.objRef.value));
+        else if (a.kind === 'trigger_next_slide' || a.kind === 'history_next') out.push('the next slide');
+        else if (a.kind === 'history_prev' || a.kind === 'trigger_prev_slide') out.push('the previous slide');
+        else if (a.kind === 'nextviewedslide') out.push('the next question to review');
+        else if (a.kind === 'if_action') out.push(...destinations(a.thenActions, depth), ...destinations(a.elseActions, depth));
+        else if (a.kind === 'exe_actiongroup' && depth < 4) { const g = groups[String(a.id || '').split('.').pop()]; if (g) out.push(...destinations(g.actions, depth + 1)); }
+      }
+      return out;
+    }
+    for (const [btn, ev] of [['next', 'onnextslide'], ['prev', 'onprevslide']]) {
+      const e = (slide.events || []).find(x => x && x.kind === ev);
+      buttons[btn].goesTo = e ? [...new Set(destinations(e.actions, 0))] : [];
+      buttons[btn].hasTrigger = !!e;
+    }
+    // On-slide objects that go to another slide when clicked
+    const jumps = [];
+    for (const f of findActions(slide, ['gotoplay', 'trigger_next_slide', 'history_next', 'history_prev'])) {
+      const clicked = x => x.object && /^on(release|click)$/.test(x.event || '');
+      const from = f.group ? callers.filter(x => String(x.action.id || '').split('.').pop() === f.group && clicked(x)) : clicked(f) ? [f] : [];
+      for (const x of from) {
+        const to = f.action.kind === 'gotoplay' ? target(f.action.objRef && f.action.objRef.value) : /prev/.test(f.action.kind) ? 'the previous slide' : 'the next slide';
+        const name = nameOf(x.object.id);
+        if (!jumps.some(j => j.name === name && j.to === to)) jumps.push({ name, to });
+      }
+    }
+    // Name the objects
+    const base = new Map(ids.map(id => { const o = findObject(slide, id); return [id, o ? nameOfObject(o) : id]; }));
+    const label = id => {
+      const same = ids.filter(x => base.get(x) === base.get(id));
+      return base.get(id) + (same.length > 1 ? '” #' + (same.indexOf(id) + 1) : '”');
+    };
+    const named = s => s.replace(/\u0001(\w+)\u0001”?/g, (m, id) => label(id));
+    for (const b of Object.values(buttons)) for (const t of b.triggers) t.text = named(t.text);
+    // Buttons on the slide by name alone (two "Continue" buttons on feedback layers going to the same slide are one line)
+    const jumpList = [];
+    for (const j of jumps) {
+      const name = base.get(j.name.replace(/\u0001/g, '')) || j.name;
+      if (!jumpList.some(x => x.name === name && x.to === j.to)) jumpList.push({ name, to: j.to });
+    }
+    const here = index.get(slide.id);
+    return { slideId: slide.id, number: here ? here.number : '', title: here ? here.title : plain(slide.title), buttons, jumps: jumpList.slice(0, 8), vars: [...vars] };
+  }
+
+  // ── 6. Estimated seat time: how long the course takes to go through once ──
+  // Storyline doesn't record one, so it's worked out from the slides:
+  //   - each slide's base layer timeline ("timeline":{"duration": ms}), which runs as long as its narration and video;
+  //   - but at least the time to read the slide's text, for slides whose timeline is shorter (READING_WPM);
+  //   - layers (feedback, tabs, pop-ups) separately, as "up to", since a learner opens only some of them;
+  //   - a question bank draw counts its drawn slides, at the average of the bank's slides.
+  // Not included: time spent answering questions or choosing, and branches the learner doesn't take.
+  const READING_WPM = 200;
+  function wordsIn(layer) {
+    let n = 0;
+    (function find(o) {
+      if (!o || typeof o !== 'object') return;
+      for (const t of Array.isArray(o.textLib) ? o.textLib : []) {
+        n += ((t && t.vartext && t.vartext.blocks) || []).map(b => (b.spans || []).map(sp => sp.text).join('')).join(' ').split(/\s+/).filter(Boolean).length;
+      }
+      for (const k in o) if (k !== 'textLib') find(o[k]);
+    })(layer && layer.objects);
+    return n;
+  }
+  function slideTime(sd) {
+    const layers = Array.isArray(sd && sd.slideLayers) ? sd.slideLayers : [];
+    if (!layers.length || !layers[0].timeline) return null;   // an outline only (the slide's own file isn't read yet)
+    const timeline = layers[0].timeline.duration || 0;
+    const reading = Math.round(wordsIn(layers[0]) / READING_WPM * 60000);
+    return { timeline, reading, extra: Math.max(0, reading - timeline), layers: layers.slice(1).reduce((t, l) => t + ((l.timeline && l.timeline.duration) || 0), 0) };
+  }
+  function seatTime(data, slideData) {
+    const out = { ms: 0, timelineMs: 0, readingMs: 0, layersMs: 0, slides: 0, unread: 0, drawn: 0, questions: questionSlides(data).filter(q => !q.bank).length, wpm: READING_WPM };
+    const add = (t, times) => { out.timelineMs += t.timeline * times; out.readingMs += t.extra * times; out.layersMs += t.layers * times; };
+    // A slide file not read yet is unread; a slide inside data.js without a timeline takes no time
+    const NONE = { timeline: 0, reading: 0, extra: 0, layers: 0 };
+    const timeOf = s => s.html5url ? slideTime(slideData(s.html5url)) : slideTime(s) || NONE;
+    for (const scene of data.scenes || []) {
+      if (scene.isMessageScene) continue;
+      for (const s of scene.slides || []) {
+        const t = timeOf(s);
+        if (t) { add(t, 1); out.slides++; } else out.unread++;
+      }
+    }
+    // Question bank draws: n slides drawn from a pool, at the pool's average
+    const bank = new Map(((data.slideBank && data.slideBank.slides) || []).map(s => [s.id, s]));
+    walk(data.scenes, o => {
+      if (o.kind !== 'slidedraw') return;
+      const pool = (o.sliderefs || []).map(r => bank.get(String(r.id || '').split('.').pop())).filter(Boolean).map(timeOf).filter(Boolean);
+      const n = o.shuffle && o.shufflecount > 0 ? o.shufflecount : (o.sliderefs || []).length;
+      if (!pool.length || !n) return;
+      const avg = k => pool.reduce((t, p) => t + p[k], 0) / pool.length;
+      add({ timeline: avg('timeline'), extra: avg('extra'), layers: avg('layers') }, n);
+      out.drawn += n;
+      out.questions += n;
+    });
+    out.ms = out.timelineMs + out.readingMs;
     return out;
   }
 
@@ -459,7 +691,7 @@
 
   const api = { readProvided, frameInfo, changeFrame, slideLayouts, nextSlidePath, addMissingNav, hiddenNav, countLocks, changeSlideLocks, slideFiles, questionSlides,
     buildQuizKey, applyAnswers, questionText, describeCondition, numberFor, QUESTION_TYPES, NAV_CONTROLS,
-    completionInfo, slideIndex, slideOf, findActions, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
+    completionInfo, seatTime, slideIndex, slideOf, findActions, explainSlide, describeStatement, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else Object.defineProperty(root, '__storylineReviewCore', { value: api });   // hidden from the course's own scripts' enumeration
 })(typeof globalThis !== 'undefined' ? globalThis : this);

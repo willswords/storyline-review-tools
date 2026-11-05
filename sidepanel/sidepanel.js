@@ -10,6 +10,7 @@ const params = new URLSearchParams(location.search);
 let tabId = params.has('tab') ? Number(params.get('tab')) : null;
 const NO_SETTINGS = { freeNav: false, seekbar: false, nav: false, unhide: false, answers: false };
 let settings = Object.assign({}, NO_SETTINGS);
+let lastCheck = null;   // which options were unavailable when the course in the tab was last fully checked
 let state = null;
 
 async function findTab() {
@@ -46,7 +47,7 @@ for (const [id, key] of Object.entries(KEYS)) {
 }
 // "Unlock all navigation": turns on (or off) every navigation option the course has something to unlock, saved in one
 // go so the course reloads once. Ticked when they're all on, a dash when only some are.
-const NAV_IDS = ['slFree', 'slSeek', 'slNav', 'slUnhide'];
+const NAV_IDS = ['slFree', 'slSeek', 'slNav'];   // not "Add Next/Prev buttons where turned off": that adds buttons, it doesn't unlock them
 const availableNav = () => NAV_IDS.filter(id => !$(id).disabled);
 $('slAllNav').addEventListener('change', e => {
   const on = e.target.checked, change = {};
@@ -65,10 +66,12 @@ function renderAllNav() {
 $('btnReload').addEventListener('click', () => { chrome.tabs.sendMessage(tabId, { type: 'reload' }).catch(() => {}); });
 
 // ── Collapsible sections (remembered in this browser) ──
+// A section marked data-start-collapsed starts closed until it's first opened, so a new user isn't shown everything at once
 for (const sec of document.querySelectorAll('section')) {
   const btn = sec.querySelector('.sec-toggle'), key = 'collapsed:' + sec.id;
   const set = c => { sec.classList.toggle('collapsed', c); btn.setAttribute('aria-expanded', String(!c)); };
-  set(localStorage.getItem(key) === '1');
+  const saved = localStorage.getItem(key);
+  set(saved === null ? sec.hasAttribute('data-start-collapsed') : saved === '1');
   btn.addEventListener('click', () => { const c = !sec.classList.contains('collapsed'); set(c); localStorage.setItem(key, c ? '1' : '0'); });
 }
 
@@ -129,9 +132,71 @@ function render(st) {
       (can < qs.length ? ' The others (such as drag-and-drop and drop-down questions) are answered by hand; see Quiz answers.' : '');
   $('slAnswers').disabled = !!st && !!locks && locks.checked && !can && !settings.answers;
 
+  // While a reloaded course is still being checked, the options keep what the last check of the same course found
+  // (otherwise each would count as available for a moment, and Unlock all navigation would show a dash)
+  if (st && st.locks && st.locks.checked) lastCheck = { tabId, title: st.title, disabled: Object.fromEntries(Object.keys(KEYS).map(id => [id, $(id).disabled])) };
+  else if (st && lastCheck && lastCheck.tabId === tabId && lastCheck.title === st.title) {
+    for (const id of Object.keys(KEYS)) if (!$(id).checked) $(id).disabled = lastCheck.disabled[id];
+  }
   renderAllNav();
+  renderSlide(st && st.current);
   renderCompletion(st && st.completion);
   renderQuiz(st && st.quiz);
+}
+
+// This slide: why Next and Prev are (or aren't) there, and what would get past them
+function renderSlide(cur) {
+  $('slideSec').hidden = !cur;
+  if (!cur) return;
+  $('slideName').innerHTML = 'Slide <b>' + esc(cur.number) + '</b>' + (cur.title ? ' “' + esc(cur.title) + '”' : '');
+  const on = key => state && state.settings[key];
+  const part = (btn, label) => {
+    const b = cur.buttons[btn], live = cur.live[btn];
+    const status = !live.shown ? ['off', 'Not showing'] : !live.enabled ? ['off', 'Greyed out'] : ['ok', 'Available'];
+    const items = [];
+    if (b.off) items.push({ cls: 'lock', text: 'Turned off in this slide’s Player features (slide properties)' + (on('unhide') ? ', added by Add Next/Prev buttons where turned off.' : '.') });
+    for (const t of b.triggers) items.push({ cls: t.effect === 'enable' ? 'free' : 'lock', text: t.text });
+    if (btn === 'prev' && b.autoPrev && live.shown && !live.enabled && !b.triggers.some(t => t.effect !== 'enable'))
+      items.push({ cls: 'lock', text: 'Storyline disables Prev on the first slide you open, as there’s nothing to go back to yet.' });
+    const dest = b.goesTo.length ? b.goesTo : [];
+    items.push({ cls: 'free', text: dest.length === 1 ? 'Goes to ' + dest[0] + '.' : dest.length ? 'Goes to ' + dest.slice(0, -1).join(', ') + ' or ' + dest[dest.length - 1] + ', depending on conditions.'
+      : b.off && !on('unhide') ? 'Has nowhere to go: the slide was published without a ' + label + ' trigger.'
+      : label + ' has no trigger on this slide, so it does nothing.' });
+    // What would get past it
+    const tips = [];
+    if (b.off && !on('unhide')) tips.push('<b>Add Next/Prev buttons where turned off</b> adds it.');
+    if (b.triggers.some(t => t.effect === 'disable') && !on('nav')) tips.push('<b>Unlock Next/Prev buttons</b> keeps it enabled.');
+    if (b.triggers.some(t => t.effect === 'disable') && on('nav')) tips.push('Unlock Next/Prev buttons is on, so its Disabled triggers don’t take effect.');
+    if (b.triggers.some(t => t.effect === 'hide')) tips.push('No option overrides a trigger that hides it' + (on('freeNav') ? '; jump on from the menu.' : '; <b>Free navigation (menu)</b> lets you jump on from the menu.'));
+    return '<div><div class="btn-head">' + label + ' <span class="badge ' + status[0] + '">' + status[1] + '</span></div><ul>' +
+      items.map(i => '<li class="' + i.cls + '">' + esc(i.text) + '</li>').join('') + '</ul>' +
+      (tips.length && status[0] === 'off' ? '<div class="tip">' + tips.join(' ') + '</div>' : '') + '</div>';
+  };
+  const vals = Object.entries(cur.values || {});
+  $('slideNav').innerHTML = part('next', 'Next') + part('prev', 'Prev') +
+    (cur.jumps.length ? '<div><div class="btn-head">Buttons on this slide</div><ul>' + cur.jumps.map(j => '<li class="free">“' + esc(j.name) + '” goes to ' + esc(j.to) + '.</li>').join('') + '</ul></div>' : '') +
+    (vals.length ? '<div class="now">Now: ' + vals.map(([k, v]) => esc(k) + ' = ' + esc(typeof v === 'boolean' ? (v ? 'True' : 'False') : JSON.stringify(v))).join(', ') + '</div>' : '');
+}
+
+// Estimated seat time (core.seatTime): rounded to the minute, as a catalogue would list it
+const minutes = ms => {
+  const m = Math.max(1, Math.round(ms / 60000));
+  return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '');
+};
+const exact = ms => { const s = Math.round(ms / 1000); return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : ''); };
+function renderSeat(seat) {
+  const how = $('compSeatHow');
+  if (!seat) { $('compSeat').textContent = 'Reading the course…'; how.hidden = true; return; }
+  const upTo = seat.layersMs >= 30000 ? ' (up to ' + esc(minutes(seat.ms + seat.layersMs)) + ' if every layer is opened)' : '';
+  $('compSeat').innerHTML = 'About <b>' + esc(minutes(seat.ms)) + '</b>' + upTo + (seat.unread ? ' · still reading ' + seat.unread + ' slide(s)…' : '');
+  how.hidden = false;
+  $('compSeatList').innerHTML = [
+    'Slide timelines: ' + exact(seat.timelineMs) + ' across ' + seat.slides + ' slide(s)' + (seat.drawn ? ', including ' + seat.drawn + ' drawn from a question bank' : '') + '.',
+    seat.readingMs >= 1000 ? 'Reading time: ' + exact(seat.readingMs) + ' more, for slides whose text takes longer to read than their timeline (at ' + seat.wpm + ' words a minute).' : '',
+    seat.layersMs >= 1000 ? 'Layers: up to ' + exact(seat.layersMs) + ' more, if every layer (feedback, tabs, pop-ups) is opened.' : '',
+    seat.questions ? 'Not included: time spent answering ' + seat.questions + ' question(s).' : '',
+    'Assumes every slide is viewed once, without pauses or replays.'
+  ].filter(Boolean).map(t => '<li>' + esc(t) + '</li>').join('');
 }
 
 // Completion: the status the course has reported in this session, what an LMS would get, and how the course completes
@@ -161,6 +226,7 @@ function renderCompletion(c) {
     : '<span class="' + (h.status === 'fail' ? 'fail' : 'ok') + '">' + esc(words[h.status]) + '</span>' + (h.score != null ? ' · score ' + esc(h.score) + '%' : '') + (h.reason ? ' · ' + esc(h.reason) : '')) +
     (onSlide(h.slide) ? ' · ' + onSlide(h.slide) : '') + '</li>').join('');
 
+  renderSeat(c.seat);
   // How the course completes, from data.js
   const info = c.info;
   if (!info) { $('compHow').innerHTML = '<div class="rep">Reading the course…</div>'; return; }

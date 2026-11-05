@@ -40,6 +40,8 @@ const EXT = path.join(__dirname, '..');
     const how = await waitP(`!document.getElementById('compSec').hidden && /Complete when/.test(document.getElementById('compHow').textContent) && document.getElementById('compHow').textContent`, 20000);
     check('the Completion section says how the course completes', !!how, how || await P(`document.getElementById('compHow').textContent`));
     check('… and that nothing is reported yet', /Not reported yet/.test(await note('compNow')), await note('compNow'));
+    const seat = await waitP(`/^About \\d+ (min|h)/.test(document.getElementById('compSeat').textContent) && !/still reading/.test(document.getElementById('compSeat').textContent) && document.getElementById('compSeat').textContent`, 20000);
+    check('… and an estimated seat time, with how it’s worked out', !!seat && /Slide timelines: .+ across \d+ slide/.test(await note('compSeatList')), (seat || await note('compSeat')) + ' | ' + (await note('compSeatList')));
 
     // Turn on free navigation and answers: the course reloads with them
     await P(`document.getElementById('slFree').click(); document.getElementById('slAnswers').click(); 1`);
@@ -63,8 +65,26 @@ const EXT = path.join(__dirname, '..');
     }
     check('the course menu locks no slides', locked === 0, locked);
 
-    // A screenshot of the panel at side-panel width
+    // This slide (now the course tab is in front, so the player has started the slide)
+    const slideSec = await waitP(`!document.getElementById('slideSec').hidden && /^Slide 1\\.1/.test(document.getElementById('slideName').textContent) && document.getElementById('slideNav').textContent`, 20000);
+    check('This slide names the slide and explains Next and Prev', !!slideSec && /Next/.test(slideSec) && /Prev/.test(slideSec) && /Goes to slide 1\.2/.test(slideSec),
+      (slideSec || await P(`JSON.stringify({ hidden: document.getElementById('slideSec').hidden, name: document.getElementById('slideName').textContent })`)).slice(0, 300));
+    const closed = () => P(`document.getElementById('slideSec').classList.contains('collapsed')`);
+    check('This slide starts collapsed', await closed());
+    await P(`document.querySelector('#slideSec .sec-toggle').click(); 1`);
+    check('… and opens when its heading is clicked', !(await closed()));
+    if (slideSec) {
+      await cdp.send('Emulation.setDeviceMetricsOverride', { width: 400, height: 900, deviceScaleFactor: 1, mobile: false }, panel);
+      const box = await P(`(() => { const r = document.getElementById('slideSec').getBoundingClientRect(); return { y: r.top + scrollY, h: r.height }; })()`);
+      saveScreenshot('side-panel-this-slide.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: box.y, width: 400, height: Math.min(box.h, 700), scale: 1 } }, panel)).result.data);
+    }
+
+    // A screenshot of the panel at side-panel width, and of the seat time with how it's worked out
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 400, height: 900, deviceScaleFactor: 1, mobile: false }, panel);
+    await P(`document.getElementById('compSeatHow').open = true; 1`);
+    const sb = await P(`(() => { const a = document.getElementById('compSeat').previousElementSibling.getBoundingClientRect(), b = document.getElementById('compSeatHow').getBoundingClientRect(); return { y: a.top + scrollY - 4, h: b.bottom - a.top + 8 }; })()`);
+    saveScreenshot('side-panel-seat-time.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: sb.y, width: 400, height: sb.h, scale: 1 } }, panel)).result.data);
+    await P(`document.getElementById('compSeatHow').open = false; 1`);
     saveScreenshot('side-panel.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }, panel)).result.data);
 
     // Turn them off: back to the published course
@@ -83,10 +103,10 @@ const EXT = path.join(__dirname, '..');
     await P(`document.getElementById('slAllNav').click(); 1`);
     await sleep(1000);
     let s = await saved();
-    check('ticking it turns on free navigation, Unlock Next/Prev, Add Next/Prev where turned off, and leaves the unavailable seekbar alone', s && s.freeNav && s.nav && s.unhide && !s.seekbar && !s.answers, JSON.stringify(s));
+    check('ticking it turns on free navigation and Unlock Next/Prev, and leaves the unavailable seekbar and Add Next/Prev alone', s && s.freeNav && s.nav && !s.unhide && !s.seekbar && !s.answers, JSON.stringify(s));
     check('… and it shows ticked', JSON.stringify(await all()) === '{"checked":true,"mixed":false,"disabled":false}', JSON.stringify(await all()));
-    const reloaded = await waitP(`/opened as "free"/.test(document.getElementById('slFreeNote').textContent) && /kept enabled/.test(document.getElementById('slNavNote').textContent) && /→ added/.test(document.getElementById('slUnhideNote').textContent)`);
-    check('the course reloads with all three on', !!reloaded, (await note('slNavNote')) + ' | ' + (await note('slUnhideNote')));
+    const reloaded = await waitP(`/opened as "free"/.test(document.getElementById('slFreeNote').textContent) && /kept enabled/.test(document.getElementById('slNavNote').textContent)`);
+    check('the course reloads with both on', !!reloaded, await note('slNavNote'));
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 400, height: 900, deviceScaleFactor: 1, mobile: false }, panel);
     saveScreenshot('side-panel-all-nav.png', (await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 400, height: 480, scale: 1 } }, panel)).result.data);
     await P(`document.getElementById('slNav').click(); 1`);
@@ -95,7 +115,7 @@ const EXT = path.join(__dirname, '..');
     await P(`document.getElementById('slAllNav').click(); 1`);
     await sleep(500);
     s = await saved();
-    check('clicking the dash turns them all on again', s && s.freeNav && s.nav && s.unhide && (await all()).checked, JSON.stringify(s));
+    check('clicking the dash turns them all on again', s && s.freeNav && s.nav && !s.unhide && (await all()).checked, JSON.stringify(s));
     await P(`document.getElementById('slAllNav').click(); 1`);
     await sleep(500);
     s = await saved();

@@ -49,6 +49,20 @@ button.small:hover{border-color:var(--accent);color:var(--accent)}
 .sl-foot{margin-top:10px;font-size:11px;color:var(--muted)}
 
 .sl-head{margin-top:12px;font-size:12px;font-weight:600}
+.slide-name{font-size:12px;color:var(--muted);margin-bottom:6px}
+.slide-name b{color:var(--text);font-weight:600}
+#slideNav{font-size:12px;display:flex;flex-direction:column;gap:8px}
+#slideNav .btn-head{display:flex;align-items:center;gap:8px;font-weight:600}
+#slideNav .badge{border-radius:999px;padding:0 8px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--muted)}
+#slideNav .badge.ok{background:var(--ok);color:var(--surface)}
+#slideNav .badge.off{background:var(--warn);color:var(--surface)}
+#slideNav ul{margin:3px 0 0;padding-left:18px}
+#slideNav li{margin-bottom:2px}
+#slideNav li.lock{color:var(--text)}
+#slideNav li.free{color:var(--muted)}
+#slideNav .tip{color:var(--muted);margin-top:3px}
+#slideNav .tip b{color:var(--text)}
+#slideNav .now{font-family:var(--mono);font-size:11px;color:var(--muted)}
 .comp-now{display:flex;align-items:flex-start;gap:8px}
 .comp-now .badge{flex:none;border-radius:999px;padding:1px 9px;font-weight:600;font-size:12px;background:var(--surface2);color:var(--muted)}
 .comp-now .badge.ok{background:var(--ok);color:var(--surface)}
@@ -68,6 +82,10 @@ button.small:hover{border-color:var(--accent);color:var(--accent)}
 .comp-history .ok{color:var(--ok);font-weight:600}
 .comp-history .fail{color:var(--err);font-weight:600}
 #compHow{font-size:12px}
+#compSeat{font-size:12px}
+#compSeat b{font-size:13px}
+#compSeatList{margin:4px 0 0 14px;padding-left:14px;font-size:11px;color:var(--muted)}
+#compSeatList li{margin-bottom:2px}
 #compHow ul{margin:4px 0 0;padding-left:18px}
 #compHow li{margin-bottom:4px}
 #compHow .where{color:var(--muted);font-size:11px}

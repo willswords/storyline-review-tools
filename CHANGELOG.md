@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.1 (2026-11-05)
+
+- **Captions and notes headings appear once.** In Changes since an earlier version, a slide's caption changes are listed under one "Captions:" heading, and its notes changes under one "Notes:", instead of the heading repeating on every line. Captions on a layer have their own heading, such as "Captions (Layer 2):", in place of the "[Layer 2]" label on each line.
+
 ## 1.7.0 (2026-11-05)
 
 - **Number the menu entries**, a new option: the course menu shows each entry numbered (1.1, 1.2…), by turning on the player's "Number entries automatically" menu setting (`autonumber` in `frame.js`) as the course loads. It's greyed out when the menu is already numbered.

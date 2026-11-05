@@ -284,15 +284,30 @@ function renderVersions(v) {
   const html =
     d.changed.map(c => li(c) + slide(c) +
       [c.moved ? 'moved from slide ' + esc(c.moved) : '', c.renamed ? 'renamed from “' + esc(c.renamed) + '”' : ''].filter(Boolean).map(t => '<div class="what">' + t + '</div>').join('') +
-      // (captions and notes are labelled, with the change starting on the next line)
-      [[c.text, ''], [c.captions || [], 'Captions:'], [Array.isArray(c.notes) ? c.notes : [], 'Notes:']].map(([lines, label]) => lines.map(t => '<div class="pair">' + (label ? label + '<br>' : '') +
-        (t.was != null && t.now != null ? wasNow(t.was, t.now)
-          : t.now != null ? '<span class="add">Added</span> ' + quoted(t.now) : '<span class="del">Removed</span> ' + quoted(t.was)) + '</div>').join('')).join('') +
+      c.text.map(t => '<div class="pair">' + changeLine(t) + '</div>').join('') +
+      // Captions and notes under one heading each (per layer for captions), with their changes listed below it
+      labelled(c.captions || [], 'Captions') + labelled(Array.isArray(c.notes) ? c.notes : [], 'Notes') +
       '</li>').join('') +
     d.added.map(s => li(s, v.thisIsNewer) + '<span class="add">Added</span> ' + slide(s, v.thisIsNewer) + '</li>').join('') +
     d.removed.map(s => li(s, !v.thisIsNewer) + '<span class="del">Removed</span> ' + slide(s, !v.thisIsNewer) + ' <span class="what">(its number in the older version)</span></li>').join('');
   // (only when it changed, so the list isn't rebuilt under the reviewer's pointer as the course plays)
   if ($('versList').dataset.html !== html) { $('versList').innerHTML = html; $('versList').dataset.html = html; }
+}
+// One change: old → new, or Added / Removed
+const changeLine = t => t.was != null && t.now != null ? wasNow(t.was, t.now)
+  : t.now != null ? '<span class="add">Added</span> ' + quoted(t.now) : '<span class="del">Removed</span> ' + quoted(t.was);
+// Changes under a heading shown once: "Captions:", or "Captions (Layer 2):" for a layer's captions (each line's
+// "[Layer 2] " label goes into the heading)
+function labelled(lines, name) {
+  const groups = new Map();
+  for (const t of lines) {
+    const layer = (/^\[([^\]]+)\] /.exec(t.now != null ? t.now : t.was) || [])[1] || '';
+    const strip = s => s == null ? s : s.replace(/^\[[^\]]+\] /, '');
+    if (!groups.has(layer)) groups.set(layer, []);
+    groups.get(layer).push({ was: strip(t.was), now: strip(t.now) });
+  }
+  return [...groups].map(([layer, list]) => '<div class="pair"><div class="pair-head">' + name + (layer ? ' (' + esc(layer) + ')' : '') + ':</div>' +
+    list.map(t => '<div class="pair-item">' + changeLine(t) + '</div>').join('') + '</div>').join('');
 }
 // A slide link: go to that slide in the course
 $('versList').addEventListener('click', e => {

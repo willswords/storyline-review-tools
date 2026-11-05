@@ -68,6 +68,7 @@ button.small:hover{border-color:var(--accent);color:var(--accent)}
 .vers-list .pair{margin-top:2px;padding-left:8px;border-left:2px solid var(--border);overflow-wrap:anywhere}
 .vers-list .pair .was{color:var(--err);text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--err) 60%,transparent)}
 .vers-list .pair .now{color:var(--ok)}
+.vers-list .pair-item + .pair-item{margin-top:3px}
 /* Word by word: removed words bold in the old text; added words bold and highlighted, and removals marked, in the new */
 .vers-list .pair b.del{font-weight:700}
 .vers-list .pair b.ins{font-weight:700;color:var(--text);background:color-mix(in srgb,var(--ok) 22%,transparent);border-radius:3px;padding:0 2px}

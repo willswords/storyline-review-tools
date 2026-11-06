@@ -28,6 +28,12 @@ const EXT = path.join(__dirname, '..');
     const waitP = async (expr, ms = 60000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { const v = await P(expr); if (v) return v; } catch (e) {} await sleep(500); } return null; };
     const note = id => P(`document.getElementById('${id}').textContent`);
     const badge = () => P(`chrome.action.getBadgeText({})`);
+    const shown = id => P(`(e => !!e && !e.closest('[hidden]') && getComputedStyle(e).display !== 'none' && !e.closest('section.collapsed > :not(h2)'))(document.getElementById('${id}'))`);
+
+    // Developer mode starts off (the simple panel); most of this test is in Developer mode, the simple panel is checked after
+    check('Developer mode starts off', (await P(`document.body.classList.contains('simple') && !document.getElementById('devMode').checked`)) === true);
+    await P(`document.getElementById('devMode').click(); 1`);
+    check('… and ticking it turns it on (saved)', !!(await waitP(`!document.body.classList.contains('simple') && chrome.storage.local.get('devMode').then(r => r.devMode === true)`, 5000)));
 
     const found = await waitP(`!document.getElementById('course').classList.contains('warn') && /trigger/.test(document.getElementById('slNavNote').textContent)`);
     check('the side panel finds the course in the tab', !!found, await P(`document.getElementById('course').textContent`));
@@ -105,6 +111,32 @@ const EXT = path.join(__dirname, '..');
     saveScreenshot('side-panel-seat-time.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { x: 0, y: sb.y, width: 400, height: sb.h, scale: 1 } }, panel)).result.data);
     await P(`document.getElementById('compSeatHow').open = false; 1`);
     saveScreenshot('side-panel.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }, panel)).result.data);
+
+    // Developer mode off: the simple panel for a content reviewer
+    await P(`document.getElementById('devMode').click(); 1`);
+    check('turning Developer mode off shows the simple panel', !!(await waitP(`document.body.classList.contains('simple')`, 5000)));
+    check('… without the notes under the options, or the sentences above and below them', !(await shown('slFreeNote')) && !(await shown('slNavNote')) && (await shown('slFree')) &&
+      (await P(`[...document.querySelectorAll('.sl-intro, .sl-foot, #versSec .vers-note:not(#versNone)')].every(e => getComputedStyle(e).display === 'none')`)));
+    check('… This slide shows just its text, ready to copy', (await shown('slideText')) && !(await shown('slideNav')) && !(await shown('btnCopyText')) && !(await shown('btnCloseText')) &&
+      /^Text on slide /.test(await note('slideTextLabel')) && (await P(`document.getElementById('slideText').value.length`)) > 20, await note('slideTextLabel'));
+    check('… Completion shows the status and seat time only', (await shown('compNow')) && (await shown('compSeat')) && !(await shown('compHow')) && !(await shown('compSeatHow')) && !(await shown('compHistory')));
+    check('… Changes since an earlier version is still there', !(await P(`document.getElementById('versSec').hidden`)));
+    check('… and the quiz answers start collapsed', await P(`document.getElementById('quizSec').classList.contains('collapsed') && !document.getElementById('quizSec').hidden`));
+    saveScreenshot('side-panel-simple.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }, panel)).result.data);
+
+    // Text size: A+ twice zooms the panel to 125% (saved), A− goes back down, and stops at the smallest size
+    const zoom = () => P(`getComputedStyle(document.documentElement).zoom`);
+    check('text size starts at 100%', String(await zoom()) === '1', await zoom());
+    await P(`document.getElementById('btnBigger').click(); document.getElementById('btnBigger').click(); 1`);
+    check('A+ twice makes the panel’s text 125%, and is saved', String(await zoom()) === '1.25' && (await P(`chrome.storage.local.get('textSize').then(r => r.textSize)`)) === 1.25, await zoom());
+    saveScreenshot('side-panel-text-size.png', (await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 400, height: 500, scale: 1 } }, panel)).result.data);
+    for (let i = 0; i < 4; i++) await P(`document.getElementById('btnSmaller').click(); 1`);
+    check('A− goes down to 90% and stops there', String(await zoom()) === '0.9' && (await P(`document.getElementById('btnSmaller').disabled`)), await zoom());
+    await P(`document.getElementById('btnBigger').click(); 1`);
+    check('… and back to 100%', String(await zoom()) === '1', await zoom());
+    // (the rest of the test reads the Developer mode notes)
+    await P(`document.getElementById('devMode').click(); 1`);
+    await waitP(`!document.body.classList.contains('simple')`, 5000);
 
     // Turn them off: back to the published course
     await P(`for (const id of ['slFree', 'slAnswers']) document.getElementById(id).click(); 1`);

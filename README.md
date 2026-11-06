@@ -32,7 +32,17 @@ After updating the files, click the reload button on the extension's card, then 
 2. Click the **Storyline Review Tools** button (a padlock) in the toolbar. The side panel opens beside the page.
 3. Tick the options you want. The course reloads with them on.
 
-The panel shows what the course in the current tab does, and what's being changed. For example:
+### Developer mode
+
+The panel starts simple, for a content reviewer such as a subject matter expert: the options (without the notes explaining them), the text of the slide you're on ready to copy into a comment, changes since an earlier version, whether the course has completed and its estimated seat time, and the quiz answers (collapsed).
+
+Tick **Developer mode** (at the top of the panel) for everything else: a note under each option on what the course does and what's being changed, why Next and Prev are locked on the slide you're on (see [This slide](#this-slide)), and how the course completes and what an LMS would get (see [Completion](#completion)). The choice is remembered, and doesn't reload the course.
+
+### Text size
+
+**A−** and **A+** at the top of the panel make its text smaller or larger (90% to 180%), remembered in this browser. The browser's own zoom (Ctrl+ and Ctrl−) zooms the page that has the keyboard focus, which is usually the course rather than the side panel.
+
+In Developer mode, the panel shows what the course in the current tab does, and what's being changed. For example:
 
 ```
 Free navigation (menu)

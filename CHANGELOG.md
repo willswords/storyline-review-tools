@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Developer mode**, a new checkbox at the top of the panel. Off (the default), the panel is simpler, for a content reviewer such as an SME: the options without the notes above and under them, the slide's text always ready to copy (without the explanation of Next and Prev), Changes since an earlier version (collapsed, without the note on what it compares), the course's completion status and estimated seat time only, and the quiz answers (collapsed). On, the panel is as before. The choice is remembered, and doesn't reload the course.
+- **Text size:** A− and A+ buttons at the top of the panel make its text smaller or larger (90% to 180%), remembered in this browser. The browser's Ctrl+ zooms the page with the keyboard focus, usually the course, not the panel.
+- Developer mode, the text size buttons and Reload course are in a row at the top of the panel, so they're there when Storyline testing is collapsed.
+
 ## 1.7.1 (2026-11-05)
 
 - **Captions and notes headings appear once.** In Changes since an earlier version, a slide's caption changes are listed under one "Captions:" heading, and its notes changes under one "Notes:", instead of the heading repeating on every line. Captions on a layer have their own heading, such as "Captions (Layer 2):", in place of the "[Layer 2]" label on each line.

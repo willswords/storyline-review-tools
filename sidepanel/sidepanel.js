@@ -66,14 +66,64 @@ function renderAllNav() {
 $('btnReload').addEventListener('click', () => { chrome.tabs.sendMessage(tabId, { type: 'reload' }).catch(() => {}); });
 
 // ── Collapsible sections (remembered in this browser) ──
-// A section marked data-start-collapsed starts closed until it's first opened, so a new user isn't shown everything at once
-for (const sec of document.querySelectorAll('section')) {
-  const btn = sec.querySelector('.sec-toggle'), key = 'collapsed:' + sec.id;
-  const set = c => { sec.classList.toggle('collapsed', c); btn.setAttribute('aria-expanded', String(!c)); };
-  const saved = localStorage.getItem(key);
-  set(saved === null ? sec.hasAttribute('data-start-collapsed') : saved === '1');
-  btn.addEventListener('click', () => { const c = !sec.classList.contains('collapsed'); set(c); localStorage.setItem(key, c ? '1' : '0'); });
+// A section marked data-start-collapsed starts closed until it's first opened, so a new user isn't shown everything at
+// once; one marked data-simple-collapsed starts closed when Developer mode is off
+let devMode = false;
+const setCollapsed = (sec, c) => { sec.classList.toggle('collapsed', c); sec.querySelector('.sec-toggle').setAttribute('aria-expanded', String(!c)); };
+function startCollapsed() {
+  for (const sec of document.querySelectorAll('section')) {
+    const saved = localStorage.getItem('collapsed:' + sec.id);
+    setCollapsed(sec, saved !== null ? saved === '1' : sec.hasAttribute('data-start-collapsed') || (!devMode && sec.hasAttribute('data-simple-collapsed')));
+  }
 }
+startCollapsed();
+for (const sec of document.querySelectorAll('section')) {
+  sec.querySelector('.sec-toggle').addEventListener('click', () => {
+    const c = !sec.classList.contains('collapsed');
+    setCollapsed(sec, c);
+    localStorage.setItem('collapsed:' + sec.id, c ? '1' : '0');
+  });
+}
+
+// ── Text size (A− / A+): zooms the whole panel, remembered like Developer mode. (The browser's Ctrl+ zooms the page
+// with the keyboard focus, usually the course, not the side panel.)
+const TEXT_SIZES = [0.9, 1, 1.1, 1.25, 1.4, 1.6, 1.8];
+let textSize = 1;
+function applyTextSize(size) {
+  textSize = TEXT_SIZES.includes(size) ? size : 1;
+  document.documentElement.style.zoom = textSize === 1 ? '' : String(textSize);
+  const i = TEXT_SIZES.indexOf(textSize), pct = Math.round(textSize * 100) + '%';
+  $('btnSmaller').disabled = i === 0;
+  $('btnBigger').disabled = i === TEXT_SIZES.length - 1;
+  $('btnSmaller').title = 'Smaller text (now ' + pct + ')';
+  $('btnBigger').title = 'Larger text (now ' + pct + ')';
+}
+const stepTextSize = by => {
+  const size = TEXT_SIZES[Math.min(TEXT_SIZES.length - 1, Math.max(0, TEXT_SIZES.indexOf(textSize) + by))];
+  applyTextSize(size);
+  chrome.storage.local.set({ textSize: size });
+};
+$('btnSmaller').addEventListener('click', () => stepTextSize(-1));
+$('btnBigger').addEventListener('click', () => stepTextSize(1));
+chrome.storage.local.get('textSize', r => applyTextSize(r && r.textSize));
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.textSize) applyTextSize(changes.textSize.newValue); });
+
+// ── Developer mode ──
+// Off (the default), the panel is for a content reviewer such as an SME: the options without notes on what they
+// change, the slide's text ready to copy, whether the course has completed and its seat time, and the quiz answers.
+// On, it also explains how the course works: why Next and Prev are locked, what an LMS would get, how it completes.
+// It's a choice about the panel only, so the course isn't reloaded.
+function applyDevMode(on) {
+  devMode = !!on;
+  $('devMode').checked = devMode;
+  document.body.classList.toggle('simple', !devMode);
+  startCollapsed();
+  if (devMode) showSlideText(false);   // (in Developer mode the text box opens with Copy text)
+  render(state);
+}
+chrome.storage.local.get('devMode', r => applyDevMode(r && r.devMode));
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.devMode) applyDevMode(changes.devMode.newValue); });
+$('devMode').addEventListener('change', e => { applyDevMode(e.target.checked); chrome.storage.local.set({ devMode: e.target.checked }); });
 
 // ── Showing it ──
 function render(st) {
@@ -189,6 +239,8 @@ $('btnCopyAll').addEventListener('click', async e => {
 function renderSlide(cur) {
   $('slideSec').hidden = !cur;
   if (!cur) { showSlideText(false); return; }
+  // Without Developer mode, the slide's text is always there to copy (filled below when the slide changes)
+  if (!devMode && $('slideTextBox').hidden) { $('slideTextBox').hidden = false; fillSlideText(cur); }
   // Filled again for a new slide, or when the captions arrive (unless the reviewer has edited the text meanwhile)
   if (!$('slideTextBox').hidden && (textFor !== cur.slideId || ($('slideText').value === filledWith && slideTextOf(cur) !== filledWith))) fillSlideText(cur);
   $('slideName').innerHTML = 'Slide <b>' + esc(cur.number) + '</b>' + (cur.title ? ' “' + esc(cur.title) + '”' : '');

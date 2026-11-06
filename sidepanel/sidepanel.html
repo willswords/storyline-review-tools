@@ -5,16 +5,21 @@
 <title>Storyline Review Tools</title>
 <link rel="stylesheet" href="sidepanel.css">
 </head>
-<body>
+<body class="simple">
 <header>
   <h1>Storyline Review Tools</h1>
   <div id="course" class="course">Looking for a Storyline course in this tab…</div>
+  <div class="toolbar">
+    <span class="text-size" role="group" aria-label="Text size"><button id="btnSmaller" class="small" title="Smaller text" aria-label="Smaller text">A−</button><button id="btnBigger" class="small" title="Larger text" aria-label="Larger text">A+</button></span>
+    <label class="dev-toggle" title="Show how the course works: what each option changes, why Next and Prev are locked, and how the course completes"><input type="checkbox" id="devMode"> Developer mode</label>
+    <span class="grow"></span>
+    <button id="btnReload" class="small" title="Reload the course in this tab" hidden>Reload course</button>
+  </div>
 </header>
 
 <section id="slSec">
-  <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>Storyline testing</button><span class="grow"></span>
-    <button id="btnReload" class="small" title="Reload the course in this tab" hidden>Reload course</button></h2>
-  <div class="sl-intro">Changes are made in this browser as the course loads, so the course on Review isn’t changed. Each change reloads the course.</div>
+  <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>Storyline testing</button></h2>
+  <div class="sl-intro dev-only">Changes are made in this browser as the course loads, so the course on Review isn’t changed. Each change reloads the course.</div>
   <label class="chk sl"><input type="checkbox" id="slAllNav" aria-controls="slFree slSeek slNav"> Unlock all navigation</label>
   <div class="sl-group" role="group" aria-label="Navigation options">
     <label class="chk sl"><input type="checkbox" id="slFree"> Free navigation (menu)</label>
@@ -30,20 +35,20 @@
   <div class="sl-note" id="slNumbersNote"></div>
   <label class="chk sl"><input type="checkbox" id="slAnswers"> Pre-select correct quiz answers</label>
   <div class="sl-note" id="slAnswersNote"></div>
-  <div class="sl-foot">These settings apply to every Review course you open until you turn them off. The toolbar button shows <b>ON</b> while any of them is on.</div>
+  <div class="sl-foot dev-only">These settings apply to every Review course you open until you turn them off. The toolbar button shows <b>ON</b> while any of them is on.</div>
 </section>
 
 <section id="slideSec" data-start-collapsed hidden>
   <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>This slide</button><span class="grow"></span>
-    <button id="btnCopyText" class="small" title="Show all the text on this slide, to copy into a comment" aria-controls="slideTextBox" aria-expanded="false">Copy text</button></h2>
+    <button id="btnCopyText" class="small dev-only" title="Show all the text on this slide, to copy into a comment" aria-controls="slideTextBox" aria-expanded="false">Copy text</button></h2>
   <div class="slide-text" id="slideTextBox" hidden>
     <label for="slideText" id="slideTextLabel">Text on this slide</label>
     <textarea id="slideText" rows="10" spellcheck="false"></textarea>
-    <div class="slide-text-actions"><button id="btnCopyAll" class="small">Copy all</button><button id="btnCloseText" class="small">Close</button>
+    <div class="slide-text-actions"><button id="btnCopyAll" class="small">Copy all</button><button id="btnCloseText" class="small dev-only">Close</button>
       <span class="hint">Select the part you want, then copy (Ctrl+C) and paste it into your comment.</span></div>
   </div>
-  <div class="slide-name" id="slideName"></div>
-  <div id="slideNav"></div>
+  <div class="slide-name dev-only" id="slideName"></div>
+  <div id="slideNav" class="dev-only"></div>
 </section>
 
 <section id="versSec" data-start-collapsed hidden>
@@ -54,28 +59,28 @@
     <div class="vers-summary" id="versSummary"></div>
     <ul class="vers-list" id="versList"></ul>
   </div>
-  <div class="vers-note">Compares slide titles, text, closed captions, notes and slide order. Images, media, triggers and layout aren’t compared. Versions are remembered in this browser when they’re opened. Their times are when Storyline published them, which can be a minute or two before the time in Review’s version menu.</div>
+  <div class="vers-note dev-only">Compares slide titles, text, closed captions, notes and slide order. Images, media, triggers and layout aren’t compared. Versions are remembered in this browser when they’re opened. Their times are when Storyline published them, which can be a minute or two before the time in Review’s version menu.</div>
 </section>
 
 <section id="compSec" hidden>
   <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>Completion</button></h2>
   <div class="comp-now" id="compNow"></div>
-  <ol class="comp-history" id="compHistory"></ol>
-  <details class="lms-details" id="compLms" hidden>
+  <ol class="comp-history dev-only" id="compHistory"></ol>
+  <details class="lms-details dev-only" id="compLms" hidden>
     <summary>LMS details</summary>
     <div class="comp-calls" id="compCalls"></div>
   </details>
-  <div class="sl-head">How this course completes</div>
-  <div id="compHow"></div>
+  <div class="sl-head dev-only">How this course completes</div>
+  <div id="compHow" class="dev-only"></div>
   <div class="sl-head">Estimated seat time</div>
   <div id="compSeat"></div>
-  <details class="lms-details" id="compSeatHow">
+  <details class="lms-details dev-only" id="compSeatHow">
     <summary>How it’s worked out</summary>
     <ul id="compSeatList"></ul>
   </details>
 </section>
 
-<section id="quizSec" hidden>
+<section id="quizSec" data-simple-collapsed hidden>
   <h2><button class="sec-toggle" aria-expanded="true"><span class="chev"></span>Quiz answers</button><span class="count" id="quizCount"></span></h2>
   <div class="quiz-info" id="quizInfo"></div>
   <ol id="quizList"></ol>

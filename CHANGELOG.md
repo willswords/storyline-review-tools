@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.9.0 (2026-11-10)
 
 - **Prev and Next buttons in the panel**, below Add Next/Prev buttons where turned off, in both the simple view and Developer mode. They work on every slide without reloading the course: each runs the slide's own Prev or Next, even while the course hides or greys it out, and where Player features turn the button off, Next goes to the next slide in the menu and Prev goes back. A button is orange when the course hides it on the current slide.
 - **Free navigation (menu) also shows the menu** when the course's Player features turn it off, for the whole course or on some slides. The note under the option says when the menu is turned off, and the option is available for such a course even when its menu navigation is already "free".

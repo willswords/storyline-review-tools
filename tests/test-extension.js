@@ -122,6 +122,15 @@ const EXT = path.join(__dirname, '..');
     check('… Completion shows the status and seat time only', (await shown('compNow')) && (await shown('compSeat')) && !(await shown('compHow')) && !(await shown('compSeatHow')) && !(await shown('compHistory')));
     check('… Changes since an earlier version is still there', !(await P(`document.getElementById('versSec').hidden`)));
     check('… and the quiz answers start collapsed', await P(`document.getElementById('quizSec').classList.contains('collapsed') && !document.getElementById('quizSec').hidden`));
+    // Prev and Next in the panel (both modes): they move the course
+    check('… Prev and Next buttons under Add Next/Prev buttons where turned off', (await shown('btnNavPrev')) && (await shown('btnNavNext')));
+    const slideNow = () => P(`(document.getElementById('slideTextLabel').textContent.match(/slide ([\\d.]+)/) || [])[1] || ''`);
+    const from = await slideNow();
+    await P(`document.getElementById('btnNavNext').click(); 1`);
+    const moved = await waitP(`(n => n && n !== ${JSON.stringify(from)} ? n : null)((document.getElementById('slideTextLabel').textContent.match(/slide ([\\d.]+)/) || [])[1])`, 15000);
+    check('… the panel’s Next moves the course on', !!moved, from + ' → ' + moved);
+    await P(`document.getElementById('btnNavPrev').click(); 1`);
+    check('… and its Prev goes back', !!(await waitP(`(document.getElementById('slideTextLabel').textContent.match(/slide ([\\d.]+)/) || [])[1] === ${JSON.stringify(from)}`, 15000)), await slideNow());
     saveScreenshot('side-panel-simple.png', (await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }, panel)).result.data);
 
     // Text size: A+ twice zooms the panel to 125% (saved), A− goes back down, and stops at the smallest size

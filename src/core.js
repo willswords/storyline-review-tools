@@ -45,10 +45,21 @@
     const l = (frame && frame.controlLayouts) || frameOptions(frame).controlLayouts;
     return l && typeof l === 'object' ? l : {};
   };
+  // The menu itself: the player's Menu tab is "outline" in the sidebar's tabs (in "sidebar", or a link at the top:
+  // "linkLeft", "linkRight"), shown only while the sidebar is on; and each slide layout can turn it off for its slides.
+  //   "sidebarOptions": { "sidebarEnabled": true, "tabs": { "sidebar": [{ "name": "outline", "properties": {} }], … } }
+  //   "controlLayouts": { "…": { "outline": { "enabled": true, "search": false }, … } }
+  const sidebarOptions = frame => { const s = frameOptions(frame).sidebarOptions || (frame && frame.sidebarOptions); return s && typeof s === 'object' ? s : null; };
+  const hasMenuTab = sb => !!sb && !!sb.tabs && typeof sb.tabs === 'object' && Object.values(sb.tabs).some(list => Array.isArray(list) && list.some(t => t && t.name === 'outline'));
+  const layoutHidesMenu = l => !!l && (l.outline === false || (!!l.outline && typeof l.outline === 'object' && l.outline.enabled === false));
   function frameInfo(frame) {
-    const o = frameOptions(frame), menu = o.menuOptions, c = o.controls;
+    const o = frameOptions(frame), menu = o.menuOptions, c = o.controls, sb = sidebarOptions(frame);
     return {
       flow: menu && typeof menu.flow === 'string' ? menu.flow : null,
+      // The menu turned off in Player features: for the whole course (no Menu tab, or no sidebar), or on some slides
+      // (their layouts); null when the frame has no sidebar settings to tell from
+      menuOff: sb ? !hasMenuTab(sb) || sb.sidebarEnabled === false : null,
+      menuOffLayouts: Object.keys(controlLayouts(frame)).filter(k => layoutHidesMenu(controlLayouts(frame)[k])),
       // The menu's "Number entries automatically" ("autonumber"): 1.1, 1.2… before each slide's title
       menuNumbers: menu && typeof menu.autonumber === 'boolean' ? menu.autonumber : null,
       seekbar: c && typeof c.readonly === 'boolean' ? { readonly: c.readonly, readonlyOnce: c.readonlyOnce === true } : null,
@@ -62,6 +73,21 @@
     const o = frameOptions(frame);
     let n = 0;
     if (settings.freeNav && o.menuOptions && typeof o.menuOptions.flow === 'string' && o.menuOptions.flow !== 'free') { o.menuOptions.flow = 'free'; n++; }
+    // Free navigation also shows the menu where Player features turn it off: the Menu tab (first in the sidebar),
+    // the sidebar, and the slide layouts that leave the menu out
+    const sb = sidebarOptions(frame);
+    if (settings.freeNav && sb) {
+      if (!hasMenuTab(sb)) {
+        if (!sb.tabs || typeof sb.tabs !== 'object') sb.tabs = {};
+        if (!Array.isArray(sb.tabs.sidebar)) sb.tabs.sidebar = [];
+        sb.tabs.sidebar.unshift({ name: 'outline', properties: {} });
+        n++;
+      }
+      if (sb.sidebarEnabled === false) { sb.sidebarEnabled = true; n++; }
+    }
+    if (settings.freeNav) for (const l of Object.values(controlLayouts(frame))) {
+      if (layoutHidesMenu(l)) { l.outline = Object.assign({ search: false }, typeof l.outline === 'object' ? l.outline : {}, { enabled: true }); n++; }
+    }
     if (settings.menuNumbers && o.menuOptions && o.menuOptions.autonumber === false) { o.menuOptions.autonumber = true; n++; }
     if (settings.seekbar && o.controls) {
       for (const k of ['readonly', 'readonlyOnce']) if (o.controls[k] === true) { o.controls[k] = false; n++; }

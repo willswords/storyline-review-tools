@@ -29,20 +29,21 @@ Or one or more by name, for example:
 node tests/run-all.js navigation answers
 ```
 
-All six take about six minutes. Screenshots go to `tests/output/` (not in git).
+All seven take about seven minutes. Screenshots go to `tests/output/` (not in git).
 
 ## The tests
 
 | Test | Course | Checks |
 |---|---|---|
-| `test-navigation.js` | `navigation`: a "restricted" menu, and triggers disabling Next/Prev | With the settings off, the course is exactly as published: the menu locks slides, and the hook counts the locks without changing anything. With them on, the menu is free and its entries are numbered, Next is enabled, and it moves on. This slide explains slide 1.1's timeline lock and where Next goes. With `hiddenNav` (a course whose slides hide Next/Prev in their Player features), This slide follows slides 1.1 and 1.2 live (Next turned off; then greyed out until the timeline ends), and Add Next/Prev buttons where turned off shows the buttons and they move between slides. |
+| `test-navigation.js` | `navigation`: a "restricted" menu, and triggers disabling Next/Prev | With the settings off, the course is exactly as published: the menu locks slides, and the hook counts the locks without changing anything. With them on, the menu is free and its entries are numbered, Next is enabled, and it moves on. This slide explains slide 1.1's timeline lock and where Next goes. With `hiddenNav` (a course whose slides hide Next/Prev in their Player features), This slide follows slides 1.1 and 1.2 live (Next turned off; then greyed out until the timeline ends), and Add Next/Prev buttons where turned off shows the buttons and they move between slides. With the options off, the panel's Next and Prev (sent as the panel sends them) run a slide's own Next, go on from a slide whose Next is turned off, go back, and go on while Next is greyed out. |
+| `test-menu.js` | `navigation` again, published as if its menu were turned off | Its `frame.js` is changed as it loads, before the extension sees it (no Menu tab, the sidebar off, every slide leaving the menu out). Without options the course has no menu; with Free navigation the menu is back, with all its entries, and goes to the last slide. |
 | `test-answers.js` | `answers`: courses with a multiple-choice or true/false quiz | Goes to the first question through the menu. With the settings on, the correct choice is selected and nothing else is; with them off, nothing is selected. |
 | `test-question-types.js` | `questionTypesPackage`: a published course (.zip or folder), served locally | Every question type that can be pre-filled opens filled in, and Storyline's feedback after Submit says it's correct. |
 | `test-completion.js` | `completion`: three courses, tracked by a Complete Course trigger (`trigger`), slides viewed (`views`) and a quiz result (`quiz`) | The completion section reads each course's tracking and where it's met. Playing each, the status is reported on the right slide and for the right reason; the quiz is failed (Failed, score 0%), retried (back to Incomplete) and passed (Passed, score 100%). |
 | `test-versions.js` | `versions`: a course with several versions on Review | Opens the current version (saved, nothing to compare yet), uses Review's own version menu to open Version 2 (compared with the newer current version) and to go back (the renamed slide 1.1, the two removed slides and the added one are found). |
-| `test-extension.js` | `extension`: a "restricted" menu and a quiz | The extension itself, loaded into Chrome: the side panel finds the course, its notes and answer list are right, its checkboxes reload the course with the settings (menu free, toolbar badge ON), and turning them off goes back to the published course. **Unlock all navigation** turns on only the options the course can use, shows a dash when some are on, and turns them all off again. |
+| `test-extension.js` | `extension`: a "restricted" menu and a quiz | The extension itself, loaded into Chrome: the side panel finds the course, its notes and answer list are right, its checkboxes reload the course with the settings (menu free, toolbar badge ON), and turning them off goes back to the published course. The panel's Prev and Next show in the simple view and move the course. **Unlock all navigation** turns on only the options the course can use, shows a dash when some are on, and turns them all off again. |
 
-The first three inject `src/core.js` and `src/hook.js` into the course frame the way the extension's content script would, which makes them faster to run and works in Edge. `test-extension.js` loads the whole extension.
+The first four inject `src/core.js` and `src/hook.js` into the course frame the way the extension's content script would, which makes them faster to run and works in Edge. `test-extension.js` loads the whole extension.
 
 ## Things that broke these tests before
 

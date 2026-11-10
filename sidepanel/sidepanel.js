@@ -145,7 +145,11 @@ function render(st) {
   $('slFreeNote').innerHTML = !st ? '' : flow == null ? 'No menu navigation setting found in frame.js.'
     : flow === 'free' ? 'Menu navigation is already "free".'
     : 'Menu navigation is "' + esc(flow) + '"' + (used('freeNav') ? ' <span class="changed">→ opened as "free"</span>.' : '.');
-  $('slFree').disabled = !!st && flow !== 'restricted' && flow !== 'locked' && !settings.freeNav;
+  // The menu itself turned off in Player features, for the whole course or on some slides: Free navigation shows it
+  const menuOff = !!(st && st.frame && st.frame.menuOff), someOff = !!(st && st.frame && (st.frame.menuOffLayouts || []).length);
+  if (st && (menuOff || someOff)) $('slFreeNote').innerHTML += ' ' + (menuOff ? 'The menu is turned off in Player features' : 'Some slides turn the menu off in their Player features') +
+    (used('freeNav') ? ' <span class="changed">→ shown</span>.' : '.');
+  $('slFree').disabled = !!st && flow !== 'restricted' && flow !== 'locked' && !menuOff && !someOff && !settings.freeNav;
 
   // Seekbar: frame.js controls readonly / readonlyOnce, plus any slide trigger that disables it
   const sb = st && st.frame && st.frame.seekbar, locks = st && st.locks;
@@ -196,10 +200,31 @@ function render(st) {
     for (const id of Object.keys(KEYS)) if (!$(id).checked) $(id).disabled = lastCheck.disabled[id];
   }
   renderAllNav();
+  renderNavPad(st && st.current);
   renderSlide(st && st.current);
   renderVersions(st && st.versions);
   renderCompletion(st && st.completion);
   renderQuiz(st && st.quiz);
+}
+
+// Prev and Next in the panel, on every slide: they run the slide's own Prev or Next (hook.js), so a reviewer can move on
+// from a slide whose buttons are hidden without reloading the course. A button the course hides on this slide (turned
+// off in its Player features, or hidden by a trigger, so not showing in the course) is orange.
+function renderNavPad(cur) {
+  $('navPad').hidden = !cur;
+  if (!cur) return;
+  const hidden = btn => !!((cur.buttons[btn] && cur.buttons[btn].off) || (cur.live[btn] && !cur.live[btn].shown));
+  const names = [];
+  for (const [btn, id, label] of [['prev', 'btnNavPrev', 'Prev'], ['next', 'btnNavNext', 'Next']]) {
+    const h = hidden(btn), el = $(id);
+    el.classList.toggle('hidden-here', h);
+    el.setAttribute('aria-label', label + (h ? ' (hidden in the course on this slide)' : ''));
+    if (h) names.push(label);
+  }
+  $('navKey').innerHTML = names.length ? '<b>Orange</b>: ' + names.join(' and ') + (names.length > 1 ? ' are' : ' is') + ' hidden on this slide in the course.' : '';
+}
+for (const [id, dir] of [['btnNavPrev', 'prev'], ['btnNavNext', 'next']]) {
+  $(id).addEventListener('click', () => { chrome.tabs.sendMessage(tabId, { type: 'nav', dir }).catch(() => {}); });
 }
 
 // Copy text: all the slide's text in a box, to select part of and paste into a Review comment. The box keeps what's

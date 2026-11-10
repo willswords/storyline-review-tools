@@ -351,14 +351,32 @@
   }
   // Go to a slide (from a link in the side panel), as Review does when a comment is clicked: requestSlideForReview,
   // or in older players (it's in 3.121, not 3.65) the request Next makes. Neither waits for the menu's restrictions.
+  function goToSlide(slide) {
+    const wm = DS.windowManager;
+    if (typeof wm.requestSlideForReview === 'function') Promise.resolve(wm.requestSlideForReview(slide, '_frame')).catch(err => fail('go to slide', err));
+    else wm.onRequestingSlide(slide.absoluteId, null, 'push');
+  }
   document.addEventListener('storyline-review-tools:goto', e => {
     try {
       const wm = window.DS && DS.windowManager, id = String(e.detail || '');
       const slide = wm && DS.presentation.getFlatSlides().find(s => s.id === id);
-      if (!slide) return;
-      if (typeof wm.requestSlideForReview === 'function') Promise.resolve(wm.requestSlideForReview(slide, '_frame')).catch(err => fail('go to slide', err));
-      else wm.onRequestingSlide(slide.absoluteId, null, 'push');
+      if (slide) goToSlide(slide);
     } catch (err) { fail('go to slide', err); }
+  });
+  // Prev and Next from the side panel, on any slide: the slide's own Next or Prev trigger, run the way the player's
+  // buttons run it (even while the button is hidden, turned off or greyed out). A slide whose Player features turn the
+  // button off has no trigger for it, so then Next goes to the next slide in the menu's order and Prev goes back, as
+  // Add Next/Prev buttons where turned off does.
+  document.addEventListener('storyline-review-tools:nav', e => {
+    try {
+      const prev = e.detail === 'prev', event = prev ? 'onprevslide' : 'onnextslide';
+      const slide = DS.windowManager.getCurrentWindow().getCurrentSlide();
+      if (typeof slide.hasEvent === 'function' && slide.hasEvent(event)) { slide.executePlayerEvent(event); return; }
+      if (prev) { DS.pubSub.trigger(DS.events.request.PREV_SLIDE); return; }
+      const path = data && core.nextSlidePath(data, slide.id);
+      const next = path && DS.presentation.getFlatSlides().find(s => s.absoluteId === path);
+      if (next) goToSlide(next);
+    } catch (err) { fail('Next/Prev', err); }
   });
   document.addEventListener('storyline-review-tools:compare', e => {
     compareWith = typeof e.detail === 'string' ? e.detail : null;

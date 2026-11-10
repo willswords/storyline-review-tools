@@ -80,6 +80,17 @@ const LOCKED_ITEMS = `[...document.querySelectorAll('#outline-content .cs-listit
         check('… because it’s disabled until the timeline ends', lines.includes('Shown but disabled when the timeline starts.') && lines.includes('Shown and enabled when the timeline ends.'), lines.join(' | '));
         cur = await current(`&& s.current.number === '1.2' && s.current.live.next.enabled`);
         check('… and available once the timeline ends', !!cur, cur && JSON.stringify(cur.live));
+
+        // The side panel's Prev and Next, with the options off: the slide's own Next, a Next turned off, Prev, and a greyed-out Next
+        const nav = async (dir, to) => { await c.ev(`document.dispatchEvent(new CustomEvent('storyline-review-tools:nav', { detail: '${dir}' }))`); return !!(await c.waitFor(`${'(() => { try { return DS.windowManager.getCurrentWindow().getCurrentSlide().get(\'slideNumberInScene\') === ' + to + '; } catch (e) { return false; } })()'}`, 8000)); };
+        check('the panel’s Next runs slide 1.2’s own Next: on to 1.3', await nav('next', 3), await num());
+        await sleep(1500);
+        check('slide 1.3 has Next turned off, and the panel’s Next still goes on to 1.4', await nav('next', 4), await num());
+        await sleep(1500);
+        check('the panel’s Prev goes back to 1.3', await nav('prev', 3), await num());
+        await c.goToSlide('6Hc6x7vdvVE');
+        await current(`&& s.current.number === '1.2' && s.current.live.next.shown && !s.current.live.next.enabled`);
+        check('on slide 1.2 while its Next is greyed out, the panel’s Next goes on to 1.3', await nav('next', 3), await num());
       } else {
         check('slide 1.1 shows Next and Prev', (await shown('#next')) && (await shown('#prev')));
         check('Next goes to slide 1.2', await press('#next', 2), await num());

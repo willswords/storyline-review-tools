@@ -147,3 +147,11 @@ body.simple .slide-text{margin-top:2px}
 .text-size button.small:first-child{border-radius:5px 0 0 5px}
 .text-size button.small:last-child{border-radius:0 5px 5px 0;margin-left:-1px}
 .text-size button.small:disabled{color:var(--muted);border-color:var(--border);cursor:default;opacity:.6}
+/* Prev / Next in the panel (under Add Next/Prev buttons where turned off); orange when the course hides that button on this slide */
+.nav-pad[hidden]{display:none}
+.nav-pad{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:6px 0 2px 22px}
+.nav-pad .nav-btn{padding:3px 12px;font-weight:600}
+.nav-pad .nav-btn.hidden-here{background:var(--warn-bg);border-color:var(--warn);color:var(--warn)}
+.nav-pad .nav-btn.hidden-here:hover{border-color:var(--warn);color:var(--text)}
+.nav-key{font-size:11px;color:var(--muted)}
+.nav-key b{color:var(--warn);font-weight:600}

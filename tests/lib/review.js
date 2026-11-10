@@ -6,20 +6,29 @@ const { launch, sleep, saveScreenshot } = require('./browser');
 const SRC = path.join(__dirname, '..', '..', 'src');
 const COURSE_FRAME = /articulateusercontent\.com\/review\/items\/[^/]+\/story/;
 
-// The scripts the extension puts in the course frame, plus a listener that keeps the hook's latest state on window
-function injection(settings) {
+// The scripts the extension puts in the course frame, plus a listener that keeps the hook's latest state on window.
+// opts.publish(kind, json) → json, given as a function's source, changes a data file before the extension sees it, as if
+// the course had been published that way (for example frame.js with the menu turned off).
+function injection(settings, opts = {}) {
   return `localStorage.setItem('storylineReviewTools.settings', ${JSON.stringify(JSON.stringify(settings))});\n` +
     fs.readFileSync(path.join(SRC, 'core.js'), 'utf8') + '\n' + fs.readFileSync(path.join(SRC, 'hook.js'), 'utf8') +
-    `\ndocument.addEventListener('storyline-review-tools:state', e => { window.__srtState = JSON.parse(e.detail); });`;
+    `\ndocument.addEventListener('storyline-review-tools:state', e => { window.__srtState = JSON.parse(e.detail); });` +
+    (opts.publish ? `\n(() => {
+      const publish = ${opts.publish}, hook = Object.getOwnPropertyDescriptor(window, 'globalProvideData');
+      let ours;
+      Object.defineProperty(window, 'globalProvideData', { configurable: true, enumerable: true, get() { return ours; },
+        set(fn) { hook.set.call(window, fn); const theirs = hook.get.call(window);
+          ours = typeof theirs === 'function' ? function (kind, json) { return theirs.call(this, kind, typeof json === 'string' ? publish(kind, json) : json); } : theirs; } });
+    })();` : '');
 }
 
-async function openCourse(url, settings) {
+async function openCourse(url, settings, opts = {}) {
   const b = await launch({ browser: 'edge' });
   const { cdp } = b;
   const errors = [];
   const pageTarget = (await cdp.send('Target.getTargets')).result.targetInfos.find(t => t.type === 'page');
   const page = (await cdp.send('Target.attachToTarget', { targetId: pageTarget.targetId, flatten: true })).result.sessionId;
-  const inject = injection(settings);
+  const inject = injection(settings, opts);
   cdp.on(async m => {
     if (m.method === 'Runtime.exceptionThrown' && m.sessionId && m.sessionId !== page) {
       const d = m.params.exceptionDetails; errors.push((d.url || '') + ' ' + ((d.exception && d.exception.description) || d.text));

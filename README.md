@@ -36,18 +36,6 @@ After updating the files, click the reload button on the extension's card, then 
 
 Besides Articulate Review, the extension can work on courses shared for review on **reviewmyelearning.com**. Turn on **Courses on reviewmyelearning.com** in the extension's Options (right-click the toolbar button › **Options**); Chrome asks you to allow the site. Turning it off takes the access away again.
 
-### Other sites
-
-The extension works on Articulate Review. To use it on another site that serves Storyline courses, such as your LMS, add the site in the extension's **Options** (right-click the toolbar button › **Options**, or **Details › Extension options** on the extensions page):
-
-1. On the Options page, **Ctrl+click the heading** ("Storyline Review Tools"), or press **Ctrl+Shift+S**, to show **Sites**. It's hidden otherwise, as it's a setting for whoever sets the extension up, not for reviewers.
-2. Type the site's address, such as `https://burnsmcd.csod.com/*` (a bare name such as `burnsmcd.csod.com` becomes `https://burnsmcd.csod.com/*`), and press **Add**.
-3. Chrome asks you to allow the extension on that site. Allow it.
-4. Reload any course already open on the site.
-
-`*` matches anything: `https://*.example.com/*` covers every site under example.com, and `https://lms.example.com/content/*` only that part of one. A site's ports are all included. Patterns that would cover every site aren't accepted. **Remove** takes a site off the list and takes away the extension's access to it. If you take away the access in Chrome instead, the site stays listed as "Not allowed in Chrome", with **Allow** to ask again.
-
-**Changes since an earlier version** only works on Articulate Review, where each version has its own folder, so the side panel leaves it out on other sites. An LMS records what the course reports while you play it, against your account, so options such as **Pre-select correct quiz answers** can pass a course for you there.
 
 ### Side panel sections
 

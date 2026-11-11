@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.9.1 (2026-11-11)
 
 - **Other sites**, in the extension's new **Options** page: add a site that serves Storyline courses, such as an LMS (for example `https://burnsmcd.csod.com/*`), to use the extension there too. Sites is hidden on the Options page until its heading is Ctrl+clicked (or Ctrl+Shift+S is pressed). Chrome asks you to allow each site; the extension has no access to a site until it's added and allowed. Removing a site takes the access away again. Changes since an earlier version only works on Articulate Review, so the side panel leaves it out on other sites.
 - **Courses on reviewmyelearning.com**, a switch of its own in Options (shown to everyone, off by default): turning it on asks Chrome for access to `https://reviewmyelearning.com/content/*` and runs the extension there.

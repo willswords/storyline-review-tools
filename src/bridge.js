@@ -6,6 +6,9 @@
 // - Passes hook.js's state (what the course locks, the answer key, what was changed) to the side panel.
 (function () {
   'use strict';
+  // Once per frame: an added site (Options) whose pattern also covers Review would run this a second time
+  if (globalThis.__storylineReviewBridge) return;
+  globalThis.__storylineReviewBridge = true;
   const SETTINGS_KEY = 'storylineReviewTools.settings';
   const RELOADS_KEY = 'storylineReviewTools.reloads';
   const norm = s => ({ freeNav: !!(s && s.freeNav), seekbar: !!(s && s.seekbar), nav: !!(s && s.nav), unhide: !!(s && s.unhide), menuNumbers: !!(s && s.menuNumbers), answers: !!(s && s.answers) });

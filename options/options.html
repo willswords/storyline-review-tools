@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Storyline Review Tools: Options</title>
+<link rel="stylesheet" href="../sidepanel/sidepanel.css">
+<link rel="stylesheet" href="options.css">
+</head>
+<body>
+<main>
+  <h1 id="title">Storyline Review Tools</h1>
+
+  <h2 class="opt-h">Side panel sections</h2>
+  <p class="opt-intro">Choose which sections the side panel shows. A section that’s turned off is hidden; its settings stay as they were.</p>
+  <fieldset class="sections" id="sections">
+    <legend class="sr-only">Side panel sections</legend>
+    <label class="chk"><input type="checkbox" data-sec="slSec"> Storyline testing <span class="what">(the options, and Prev/Next)</span></label>
+    <label class="chk"><input type="checkbox" data-sec="slideSec"> This slide <span class="what">(the slide’s text to copy)</span></label>
+    <label class="chk"><input type="checkbox" data-sec="versSec"> Changes since an earlier version</label>
+    <label class="chk"><input type="checkbox" data-sec="compSec"> Completion <span class="what">(status and seat time)</span></label>
+    <label class="chk"><input type="checkbox" data-sec="quizSec"> Quiz answers</label>
+  </fieldset>
+
+  <h2 class="opt-h opt-h2">Review sites</h2>
+  <p class="opt-intro">The extension always works on Articulate Review. It can also work on courses shared for review on these sites. Chrome asks you to allow each one when you turn it on.</p>
+  <fieldset class="sections" id="reviewSites">
+    <legend class="sr-only">Review sites</legend>
+    <label class="chk"><input type="checkbox" id="rmel"> Courses on reviewmyelearning.com <span class="what" id="rmelState">(<code>https://reviewmyelearning.com/content/*</code>)</span></label>
+  </fieldset>
+  <div class="msg" id="rmelMsg" role="status"></div>
+
+  <!-- Other sites: an administrator's setting, hidden until the heading above is Ctrl+clicked (or Ctrl+Shift+S) -->
+  <div id="sitesPart" hidden>
+    <h2 class="opt-h opt-h2">Sites</h2>
+    <p class="opt-intro">The extension works on Storyline courses on Articulate Review. Add other sites that serve Storyline courses, such as your LMS, to use it there too. Chrome asks you to allow each site.</p>
+
+    <ul class="sites" id="sites" aria-label="Sites the extension works on">
+      <li class="site builtin"><code>https://articulateusercontent.com/review/*</code><span class="state ok">Articulate Review, always on</span></li>
+    </ul>
+
+    <form class="add" id="addForm" autocomplete="off">
+      <label for="pattern">Add a site</label>
+      <div class="add-row">
+        <input type="text" id="pattern" placeholder="https://yourlms.example.com/*" spellcheck="false" aria-describedby="patternHelp">
+        <button type="submit" class="small" id="btnAdd">Add</button>
+      </div>
+      <div class="help" id="patternHelp">A web address, where <code>*</code> matches anything: for example <code>https://burnsmcd.csod.com/*</code> for a whole site, or <code>https://lms.example.com/content/*</code> for one part of it. A bare name such as <code>lms.example.com</code> becomes <code>https://lms.example.com/*</code>.</div>
+      <div class="msg" id="msg" role="status"></div>
+    </form>
+
+    <p class="opt-note">After adding a site, reload any course already open on it. The extension’s options (Unlock all navigation and so on) apply on every site it works on. Removing a site also takes away the extension’s access to it.</p>
+  </div>
+
+  <footer class="opt-foot">
+    <p>This extension brought to you by Will Findlay and Claude Code. Email <a href="mailto:wfindlay@gmail.com">wfindlay@gmail.com</a> with any suggestions.</p>
+    <p class="legal">Provided “as is”, without warranty of any kind (see the GNU General Public License, version 3). You are responsible for how you use it and for the results: check that a course works and completes correctly in your own LMS before relying on it. Changes the extension makes affect only your own browser, but a course on a live LMS still records what you do in it. Storyline Review Tools isn’t made, endorsed or supported by Articulate.</p>
+  </footer>
+</main>
+<script src="options.js"></script>
+</body>
+</html>

@@ -303,7 +303,9 @@
   // see Review's list of versions. So each version's text is kept in this frame's localStorage (shared by every
   // Review course frame in this browser) when it's opened, and compared with the version showing.
   const VERSIONS_KEY = 'storylineReviewTools.versions', KEEP_VERSIONS = 30, MAX_STORED = 3e6;
-  const thisFolder = (/\/review\/items\/([^/]+)\//.exec(location.pathname) || [])[1] || '';
+  // Only on Articulate Review: elsewhere (a site added in Options) there's no folder per version, so versions aren't
+  // kept or compared, and the side panel doesn't show the section (state.versions stays null)
+  const thisFolder = location.host === 'articulateusercontent.com' ? (/\/review\/items\/([^/]+)\//.exec(location.pathname) || [])[1] || '' : '';
   let snapshot = null, compareWith = null;
   function storedVersions() {
     try { const v = JSON.parse(localStorage.getItem(VERSIONS_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; }

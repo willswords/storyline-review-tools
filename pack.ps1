@@ -1,5 +1,5 @@
 # Builds storyline-review-tools.zip for the Chrome Web Store and Edge Add-ons: only the files the extension runs
-# (manifest.json, src/, sidepanel/, icons/) and LICENSE. Never the tests, their course links and screenshots, the
+# (manifest.json, src/, sidepanel/, options/, icons/) and LICENSE. Never the tests, their course links and screenshots, the
 # store images, or .git. The zip isn't kept in git (see .gitignore).
 # Usage, from this folder:  powershell -ExecutionPolicy Bypass -File pack.ps1
 $ErrorActionPreference = 'Stop'
@@ -8,7 +8,7 @@ $root = $PSScriptRoot
 $out = Join-Path $root 'storyline-review-tools.zip'
 
 $files = @('manifest.json', 'LICENSE')
-foreach ($dir in 'src', 'sidepanel', 'icons') {
+foreach ($dir in 'src', 'sidepanel', 'options', 'icons') {
   $files += Get-ChildItem -Path (Join-Path $root $dir) -Recurse -File | ForEach-Object { $_.FullName.Substring($root.Length + 1) }
 }
 

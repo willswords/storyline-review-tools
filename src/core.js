@@ -947,5 +947,6 @@
     buildQuizKey, applyAnswers, questionText, describeCondition, numberFor, QUESTION_TYPES, NAV_CONTROLS,
     completionInfo, seatTime, menuNumbers, slideText, slideMedia, captionsText, captionSentences, wordChanges, slideNotes, htmlToText, courseSnapshot, compareSnapshots, slideIndex, slideOf, findActions, explainSlide, describeStatement, STATUS_WORDS, LMS_CALLS, SCORE_CALLS };
   if (typeof module === 'object' && module.exports) module.exports = api;
-  else Object.defineProperty(root, '__storylineReviewCore', { value: api });   // hidden from the course's own scripts' enumeration
+  // (hidden from the course's own scripts' enumeration; once only, if an added site's scripts run here too)
+  else if (!root.__storylineReviewCore) Object.defineProperty(root, '__storylineReviewCore', { value: api });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

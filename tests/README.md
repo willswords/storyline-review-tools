@@ -29,7 +29,7 @@ Or one or more by name, for example:
 node tests/run-all.js navigation answers
 ```
 
-All seven take about seven minutes. Screenshots go to `tests/output/` (not in git).
+All eight take about eight minutes. Screenshots go to `tests/output/` (not in git).
 
 ## The tests
 
@@ -41,6 +41,7 @@ All seven take about seven minutes. Screenshots go to `tests/output/` (not in gi
 | `test-question-types.js` | `questionTypesPackage`: a published course (.zip or folder), served locally | Every question type that can be pre-filled opens filled in, and Storyline's feedback after Submit says it's correct. |
 | `test-completion.js` | `completion`: three courses, tracked by a Complete Course trigger (`trigger`), slides viewed (`views`) and a quiz result (`quiz`) | The completion section reads each course's tracking and where it's met. Playing each, the status is reported on the right slide and for the right reason; the quiz is failed (Failed, score 0%), retried (back to Incomplete) and passed (Passed, score 100%). |
 | `test-versions.js` | `versions`: a course with several versions on Review | Opens the current version (saved, nothing to compare yet), uses Review's own version menu to open Version 2 (compared with the newer current version) and to go back (the renamed slide 1.1, the two removed slides and the added one are found). |
+| `test-sites.js` | `questionTypesPackage`, served on localhost (standing in for an LMS) | The Options page: Sites is hidden until the heading is Ctrl+clicked (a plain click doesn't show it) or Ctrl+Shift+S is pressed; before the site is added, the extension doesn't run there; an address that isn't a site is turned away; Add saves `http://localhost/*` (any port), registers the scripts and, after a reload, the side panel finds and reads the course, without Changes since an earlier version (Review only); the reviewmyelearning.com switch shows without Ctrl+click, and turning it on and off adds and removes that address from the registered scripts; turning Quiz answers off in Options hides it in the panel (and on again shows it); Remove unregisters them, and the extension stops running there. Chrome's prompt to allow a site can't be answered in a headless browser, so this loads a copy of the extension that already has access to localhost. |
 | `test-extension.js` | `extension`: a "restricted" menu and a quiz | The extension itself, loaded into Chrome: the side panel finds the course, its notes and answer list are right, its checkboxes reload the course with the settings (menu free, toolbar badge ON), and turning them off goes back to the published course. The panel's Prev and Next show in the simple view and move the course. **Unlock all navigation** turns on only the options the course can use, shows a dash when some are on, and turns them all off again. |
 
 The first four inject `src/core.js` and `src/hook.js` into the course frame the way the extension's content script would, which makes them faster to run and works in Edge. `test-extension.js` loads the whole extension.

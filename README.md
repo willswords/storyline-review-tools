@@ -32,6 +32,27 @@ After updating the files, click the reload button on the extension's card, then 
 2. Click the **Storyline Review Tools** button (a padlock) in the toolbar. The side panel opens beside the page.
 3. Tick the options you want. The course reloads with them on.
 
+### Review sites
+
+Besides Articulate Review, the extension can work on courses shared for review on **reviewmyelearning.com**. Turn on **Courses on reviewmyelearning.com** in the extension's Options (right-click the toolbar button › **Options**); Chrome asks you to allow the site. Turning it off takes the access away again.
+
+### Other sites
+
+The extension works on Articulate Review. To use it on another site that serves Storyline courses, such as your LMS, add the site in the extension's **Options** (right-click the toolbar button › **Options**, or **Details › Extension options** on the extensions page):
+
+1. On the Options page, **Ctrl+click the heading** ("Storyline Review Tools"), or press **Ctrl+Shift+S**, to show **Sites**. It's hidden otherwise, as it's a setting for whoever sets the extension up, not for reviewers.
+2. Type the site's address, such as `https://burnsmcd.csod.com/*` (a bare name such as `burnsmcd.csod.com` becomes `https://burnsmcd.csod.com/*`), and press **Add**.
+3. Chrome asks you to allow the extension on that site. Allow it.
+4. Reload any course already open on the site.
+
+`*` matches anything: `https://*.example.com/*` covers every site under example.com, and `https://lms.example.com/content/*` only that part of one. A site's ports are all included. Patterns that would cover every site aren't accepted. **Remove** takes a site off the list and takes away the extension's access to it. If you take away the access in Chrome instead, the site stays listed as "Not allowed in Chrome", with **Allow** to ask again.
+
+**Changes since an earlier version** only works on Articulate Review, where each version has its own folder, so the side panel leaves it out on other sites. An LMS records what the course reports while you play it, against your account, so options such as **Pre-select correct quiz answers** can pass a course for you there.
+
+### Side panel sections
+
+The Options page, at the top, chooses which sections the side panel shows: **Storyline testing**, **This slide**, **Changes since an earlier version**, **Completion** and **Quiz answers**. They're all on to start with. A section turned off is hidden in every course, and its settings stay as they were (turning off Storyline testing hides the options, not their effect).
+
 ### Developer mode
 
 The panel starts simple, for a content reviewer such as a subject matter expert: the options (without the notes explaining them), the text of the slide you're on ready to copy into a comment, changes since an earlier version, whether the course has completed and its estimated seat time, and the quiz answers (collapsed).
@@ -201,7 +222,7 @@ For completion, it reads `data.js`'s `scorings` (the Tracking settings) and find
 
 - **Slides whose Next has no destination.** Some slides are designed to move on through their own buttons. Use free navigation to jump past them from the menu.
 - **On-slide buttons that are hidden**, and on-slide buttons, tabs or layers that wait for a variable. They're part of the slide, not the player's controls.
-- **Courses that aren't on Articulate Review.** It only runs on Review's course frames.
+- **Courses on other sites, until they're added.** It runs on Review's course frames, and on the sites added in Options (see [Other sites](#other-sites)).
 
 ## Files
 
@@ -211,8 +232,9 @@ For completion, it reads `data.js`'s `scorings` (the Tracking settings) and find
 | `src/core.js` | The Storyline logic: reading settings and locks, building the answer key, filling in answers, reading the tracking settings. Shared with the side panel. |
 | `src/hook.js` | Runs in the course frame before the player: makes the changes, follows the course's completion status, and shows the completion message. |
 | `src/bridge.js` | Connects the course frame to the extension: passes the settings in, reloads the course when they change, reports to the side panel. |
-| `src/background.js` | Opens the side panel from the toolbar button, and shows **ON** on it. |
+| `src/background.js` | Opens the side panel from the toolbar button, shows **ON** on it, and runs the course scripts on the sites added in Options. |
 | `sidepanel/` | The side panel. |
+| `options/` | The Options page: the other sites the extension works on, and which side panel sections show. |
 | `icons/` | The toolbar icon. |
 | `tests/` | Automated tests in headless Edge and Chrome; see [tests/README.md](tests/README.md). |
 | `pack.ps1` | Builds `storyline-review-tools.zip` for the Chrome Web Store and Edge Add-ons. |
@@ -223,7 +245,7 @@ For completion, it reads `data.js`'s `scorings` (the Tracking settings) and find
 powershell -ExecutionPolicy Bypass -File pack.ps1
 ```
 
-This builds `storyline-review-tools.zip` with only what the extension runs: `manifest.json`, `src/`, `sidepanel/`, `icons/` and `LICENSE`. It checks that every file `manifest.json` names is included. Don't zip the folder by hand: that would take in `.git`, the tests, and `tests/courses.json` with your Review links. The zip isn't kept in git.
+This builds `storyline-review-tools.zip` with only what the extension runs: `manifest.json`, `src/`, `sidepanel/`, `options/`, `icons/` and `LICENSE`. It checks that every file `manifest.json` names is included. Don't zip the folder by hand: that would take in `.git`, the tests, and `tests/courses.json` with your Review links. The zip isn't kept in git.
 
 ## Testing
 
@@ -237,4 +259,6 @@ The tests run against real courses: your own Review links and a published quiz, 
 
 - **storage:** to remember the options.
 - **sidePanel:** to show the side panel.
-- Content scripts run only on `https://articulateusercontent.com/review/*`, the frames Review shows courses in.
+- Content scripts run on `https://articulateusercontent.com/review/*`, the frames Review shows courses in, and on the sites added in Options.
+- **scripting:** to run the course scripts on the sites added in Options.
+- **Optional access to other sites:** asked for one site at a time, only when you add it in Options. The extension has no access to a site until you add and allow it.

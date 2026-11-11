@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Other sites**, in the extension's new **Options** page: add a site that serves Storyline courses, such as an LMS (for example `https://burnsmcd.csod.com/*`), to use the extension there too. Sites is hidden on the Options page until its heading is Ctrl+clicked (or Ctrl+Shift+S is pressed). Chrome asks you to allow each site; the extension has no access to a site until it's added and allowed. Removing a site takes the access away again. Changes since an earlier version only works on Articulate Review, so the side panel leaves it out on other sites.
+- **Courses on reviewmyelearning.com**, a switch of its own in Options (shown to everyone, off by default): turning it on asks Chrome for access to `https://reviewmyelearning.com/content/*` and runs the extension there.
+- **Choose the side panel's sections**, also in Options: Storyline testing, This slide, Changes since an earlier version, Completion and Quiz answers can each be turned off. All are on by default.
+
 ## 1.9.0 (2026-11-10)
 
 - **Prev and Next buttons in the panel**, below Add Next/Prev buttons where turned off, in both the simple view and Developer mode. They work on every slide without reloading the course: each runs the slide's own Prev or Next, even while the course hides or greys it out, and where Player features turn the button off, Next goes to the next slide in the menu and Prev goes back. A button is orange when the course hides it on the current slide.

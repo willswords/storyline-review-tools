@@ -108,6 +108,13 @@ $('btnBigger').addEventListener('click', () => stepTextSize(1));
 chrome.storage.local.get('textSize', r => applyTextSize(r && r.textSize));
 chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.textSize) applyTextSize(changes.textSize.newValue); });
 
+// ── Sections turned off in Options ("panelSections": { <section id>: false }); all are shown by default ──
+function applySections(panelSections) {
+  for (const sec of document.querySelectorAll('section')) sec.toggleAttribute('data-off', !!panelSections && panelSections[sec.id] === false);
+}
+chrome.storage.local.get('panelSections', r => applySections(r && r.panelSections));
+chrome.storage.onChanged.addListener((changes, area) => { if (area === 'local' && changes.panelSections) applySections(changes.panelSections.newValue); });
+
 // ── Developer mode ──
 // Off (the default), the panel is for a content reviewer such as an SME: the options without notes on what they
 // change, the slide's text ready to copy, whether the course has completed and its seat time, and the quiz answers.

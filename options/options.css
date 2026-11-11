@@ -1,0 +1,43 @@
+/* The Options page: the side panel's colours and buttons (sidepanel.css), in a page-width column */
+body{background:var(--bg)}
+main{max-width:640px;margin:0 auto;padding:28px 20px 40px}
+h1{font-size:20px;margin:0 0 18px}
+.opt-h{font-size:12px;margin:0 0 6px;padding:0}
+#sitesPart[hidden]{display:none}
+.opt-intro,.opt-note{color:var(--muted);font-size:13px;margin:0 0 12px}
+.opt-note{margin-top:16px;font-size:12px}
+code{font-family:var(--mono);font-size:12px;overflow-wrap:anywhere}
+
+.sites{list-style:none;margin:0 0 16px;padding:0;border:1px solid var(--border);border-radius:8px;background:var(--surface);overflow:hidden}
+.site{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 12px;border-top:1px solid var(--border)}
+.site:first-child{border-top:0}
+.site code{flex:1 1 220px;color:var(--text)}
+.site .state{font-size:12px;color:var(--muted)}
+.site .state.ok{color:var(--ok)}
+.site .state.warn{color:var(--warn)}
+.site button.small{flex:none}
+
+.add{display:flex;flex-direction:column;gap:6px}
+.add label{font-weight:600;font-size:13px}
+.add-row{display:flex;gap:8px}
+.add-row input{flex:1;min-width:0;font:13px var(--mono);color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:6px 8px}
+.add-row input:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+.add-row button.small{padding:4px 14px;font-size:13px}
+.help{font-size:12px;color:var(--muted)}
+.msg{font-size:12px;min-height:1em}
+.msg:empty{display:none}
+.msg.err{color:var(--err)}
+.msg.ok{color:var(--ok)}
+
+/* Side panel sections */
+.opt-h2{margin-top:28px}
+.sections{border:1px solid var(--border);border-radius:8px;background:var(--surface);margin:0;padding:8px 12px;display:flex;flex-direction:column;gap:2px}
+.sections .chk{padding:5px 0;font-size:13px}
+.sections .what{color:var(--muted);font-size:12px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Credit and disclaimer, at the bottom */
+.opt-foot{margin-top:36px;padding-top:14px;border-top:1px solid var(--border);font-size:12px;color:var(--muted)}
+.opt-foot p{margin:0 0 8px}
+.opt-foot a{color:var(--accent)}
+.opt-foot .legal{font-size:11px}

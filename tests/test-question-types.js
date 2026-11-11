@@ -2,38 +2,14 @@
 // on a published Storyline course served locally with the extension's scripts injected. Each question is opened from the
 // menu, checked for its filled-in answer, and submitted; Storyline's feedback must say it's correct.
 // Package: "questionTypesPackage" in tests/courses.json (a .zip, or an unzipped folder).
-const { execFileSync } = require('child_process');
-const fs = require('fs'), path = require('path'), http = require('http'), os = require('os');
 const { launch, reporter, sleep, saveScreenshot } = require('./lib/browser');
 const { injection } = require('./lib/review');
 const { courses } = require('./lib/courses');
+const { serveCourse } = require('./lib/serve');
 const { check, finish } = reporter();
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.svg': 'image/svg+xml', '.woff': 'font/woff', '.woff2': 'font/woff2', '.json': 'application/json', '.mp4': 'video/mp4', '.mp3': 'audio/mpeg' };
-
-// The package's folder (unzipping a .zip into a temp folder first), and the story file in it
-function packageFolder(src) {
-  let dir = src, temp = null;
-  if (/\.zip$/i.test(src)) {
-    temp = fs.mkdtempSync(path.join(os.tmpdir(), 'srt-pkg-'));
-    execFileSync('powershell', ['-NoProfile', '-Command', `Expand-Archive -LiteralPath '${src.replace(/'/g, "''")}' -DestinationPath '${temp}'`], { stdio: 'ignore' });
-    dir = temp;
-  }
-  const find = d => { for (const n of ['story.html', 'story_html5.html']) if (fs.existsSync(path.join(d, n))) return { root: d, story: n };
-    for (const e of fs.readdirSync(d, { withFileTypes: true })) if (e.isDirectory()) { const f = find(path.join(d, e.name)); if (f) return f; } return null; };
-  const found = find(dir);
-  if (!found) throw new Error('No story.html in ' + src);
-  return Object.assign(found, { temp });
-}
 
 (async () => {
-  const pkg = packageFolder(courses().questionTypesPackage);
-  const server = http.createServer((req, res) => {
-    const f = path.join(pkg.root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!f.startsWith(pkg.root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(f).toLowerCase()] || 'application/octet-stream' });
-    fs.createReadStream(f).pipe(res);
-  }).listen(0);
+  const course = await serveCourse(courses().questionTypesPackage);
   const b = await launch({ browser: 'edge' });
   const { cdp } = b;
   try {
@@ -57,7 +33,7 @@ function packageFolder(src) {
     await cdp.send('Page.enable', {}, s); await cdp.send('Runtime.enable', {}, s);
     await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }, s);
     await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: injection({ freeNav: true, seekbar: true, nav: true, answers: true }) }, s);
-    await cdp.send('Page.navigate', { url: `http://localhost:${server.address().port}/${pkg.story}` }, s);
+    await cdp.send('Page.navigate', { url: course.url }, s);
     const st = await waitFor(`(document.dispatchEvent(new Event('storyline-review-tools:get-state')),
       window.__srtState && window.__srtState.locks && window.__srtState.locks.checked && document.querySelectorAll('.cs-listitem[data-ref]').length > 1 ? window.__srtState : null)`, 60000);
     check('the course loads with the hook', !!st);
@@ -93,8 +69,7 @@ function packageFolder(src) {
     }
     check('no errors from the extension’s scripts', !errors.some(e => /storylineReview|core\.js|hook\.js/i.test(e)), errors.filter(e => /storylineReview/i.test(e)).slice(0, 2).join(' | ') || 'none');
   } finally {
-    b.close(); server.close();
-    if (pkg.temp) try { fs.rmSync(pkg.temp, { recursive: true, force: true }); } catch (e) {}
+    b.close(); course.close();
     finish();
   }
 })().catch(e => { console.error(e); process.exit(1); });
